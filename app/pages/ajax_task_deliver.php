@@ -51,6 +51,16 @@ $customerId = (int)$task['customer_id'];
 $amount = to_float($task['amount']);
 $taskName = (string)$task['task_name'];
 
+// Allow updating the task amount / rate upon delivery if specified
+if (isset($data['amount'])) {
+    $reqAmount = to_float($data['amount']);
+    if ($reqAmount > 0) {
+        $amount = $reqAmount;
+        $upStmt = db()->prepare('UPDATE customer_tasks SET amount = :amt WHERE id = :id AND admin_id = :aid');
+        $upStmt->execute([':amt' => $amount, ':id' => $taskId, ':aid' => $ownerId]);
+    }
+}
+
 if ($amount <= 0) {
     app_ext_api_send_json(400, ['ok' => false, 'error' => 'Task amount must be > 0']);
 }

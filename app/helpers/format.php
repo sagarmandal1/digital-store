@@ -12,6 +12,19 @@ function to_float($value): float
     if ($value === null || $value === '') {
         return 0.0;
     }
+    if (is_numeric($value)) {
+        return (float)$value;
+    }
+    if (is_string($value)) {
+        $bn = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+        $en = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        $value = str_replace($bn, $en, $value);
+        $value = preg_replace('/[^\d.-]/', '', $value);
+        if ($value === '' || $value === '-' || $value === '.') {
+            return 0.0;
+        }
+        return (float)$value;
+    }
     return (float)$value;
 }
 

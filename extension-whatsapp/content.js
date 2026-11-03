@@ -386,6 +386,79 @@
 
   const fmt = n => Number(n || 0).toFixed(2);
 
+  function parseAmount(val) {
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (!val) return 0;
+    let s = String(val).trim();
+    const bnDigits = { '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9' };
+    s = s.replace(/[০-৯]/g, d => bnDigits[d]);
+    s = s.replace(/[^0-9.-]/g, '');
+    const num = parseFloat(s);
+    return isNaN(num) ? 0 : num;
+  }
+
+  function getLatestChatMessages(limit = 10) {
+    const main = document.querySelector('#main');
+    if (!main) return [];
+    const nodes = main.querySelectorAll(
+      '.message-in .selectable-text, [data-testid="msg-container"] .selectable-text, .message-in .copyable-text'
+    );
+    const results = [];
+    for (let i = nodes.length - 1; i >= 0 && results.length < limit; i--) {
+      const text = (nodes[i].innerText || nodes[i].textContent || '').trim();
+      if (text && !results.includes(text)) {
+        results.push(text);
+      }
+    }
+    return results;
+  }
+
+  function parseApplicationText(text) {
+    if (!text || typeof text !== 'string') return null;
+    const hasAppId = /(?:application\s*id|আবেদন\s*(?:আইডি|নং)|app\s*id)/i.test(text);
+    const hasDob = /(?:date\s*of\s*birth|dob|জন্ম\s*তারিখ)/i.test(text);
+    const hasName = /(?:name|নাম)\s*[:\-]/i.test(text);
+
+    if (!hasAppId && !hasDob && !hasName) return null;
+
+    const appIdMatch = text.match(/(?:application\s*id|আবেদন\s*(?:আইডি|নং)|app\s*id)\s*[:\-]?\s*([A-Za-z0-9\-]+)/i);
+    const nameEnMatch = text.match(/(?:name\s*\(english\)|english\s*name|name\s*in\s*english)\s*[:\-]?\s*([^\n\r]+)/i);
+    const nameBnMatch = text.match(/(?:^|\n)\s*(?:name|নাম)(?:\s*\(bangla\))?\s*[:\-]?\s*([^\n\r]+)/i);
+    const dobMatch = text.match(/(?:date\s*of\s*birth|dob|জন্ম\s*তারিখ)\s*[:\-]?\s*([0-9\/\-\.]+)/i);
+    const addrMatch = text.match(/(?:office\s*address|present\s*address|permanent\s*address|address|ঠিকানা)\s*[:\-]?\s*([\s\S]+?)(?=(?:\n\s*[A-Za-z\u0980-\u09FF\s]+:|$))/i);
+
+    const appId = appIdMatch ? appIdMatch[1].trim() : '';
+    const nameEn = nameEnMatch ? nameEnMatch[1].trim() : '';
+    let nameBn = nameBnMatch ? nameBnMatch[1].trim() : '';
+    if (nameBn === nameEn || /^name\s*\(english\)/i.test(nameBn)) nameBn = '';
+
+    const dob = dobMatch ? dobMatch[1].trim() : '';
+    const address = addrMatch ? addrMatch[1].trim().replace(/\n+/g, ', ') : '';
+
+    const bestName = nameEn || nameBn || '';
+    if (!appId && (!bestName || !dob)) return null;
+
+    return {
+      raw: text,
+      appId,
+      name: bestName,
+      nameEn,
+      nameBn,
+      dob,
+      address,
+      isBirth: hasDob || /birth|জন্ম/i.test(text)
+    };
+  }
+
+  function detectChatApplication() {
+    const messages = getLatestChatMessages(10);
+    for (const msg of messages) {
+      const parsed = parseApplicationText(msg);
+      if (parsed) return parsed;
+    }
+    return null;
+  }
+
   function shortDate(value) {
     const raw = String(value || '').trim();
     if (!raw) return '--';
@@ -779,9 +852,29 @@
 
     const cfg = await getConfig();
     const writeHint = canWrite ? '' : '<div class="ds-soft-banner">Read-only scope active. Actions বন্ধ আছে।</div>';
+    const detectedApp = detectChatApplication();
+    const appBannerHtml = detectedApp ? `
+      <div class="ds-soft-banner" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.35);margin-bottom:8px;padding:8px 10px;border-radius:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;">
+          <span style="font-size:11px;font-weight:800;color:#10b981;">⚡ চ্যাটে আবেদন ডিটেক্ট হয়েছে!</span>
+          ${detectedApp.appId ? `<span style="font-size:10px;background:rgba(16,185,129,0.15);color:#059669;padding:1px 6px;border-radius:4px;font-weight:700;">ID: ${esc(detectedApp.appId)}</span>` : ''}
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);">${esc(detectedApp.name || 'জন্ম নিবন্ধন আবেদন')}</div>
+        ${detectedApp.dob ? `<div style="font-size:10.5px;color:var(--text2);margin-top:2px;">জন্ম তারিখ: <b>${esc(detectedApp.dob)}</b></div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button class="ds-btn ds-btn-primary ds-btn-sm" id="ds-detected-add" type="button" style="flex:1;" ${canWrite ? '' : 'disabled'}>
+            ⚡ ১-ক্লিকে কাজ যোগ
+          </button>
+          <button class="ds-btn ds-btn-outline ds-btn-sm" id="ds-detected-open" type="button" style="flex:1;" ${canWrite ? '' : 'disabled'}>
+            মডালে এডিট
+          </button>
+        </div>
+      </div>` : '';
+
     aEl.innerHTML = `
       <div id="ds-flow-state-wrap">${workflowHtml(flowState)}</div>
       ${writeHint}
+      ${appBannerHtml}
       <div class="ds-inline-actions">
         <button class="ds-btn ds-btn-primary" id="ds-sale-fast" type="button" ${canWrite ? '' : 'disabled'}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
@@ -965,7 +1058,7 @@
           ov.querySelector('#spdt').value = today;
 
           const calcTotal = () => {
-            return cart.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 1)), 0);
+            return cart.reduce((sum, item) => sum + (parseAmount(item.price) * (parseAmount(item.qty) || 1)), 0);
           };
 
           const updateCartUI = () => {
@@ -973,14 +1066,14 @@
               cartContainer.innerHTML = `
                 <div class="ds-soft-banner" style="margin-bottom:8px;">কার্ট খালি — প্রোডাক্ট সিলেক্ট করে যোগ করুন অথবা কুইক পরিমাণ দিন:
                   <div style="display:flex;gap:6px;margin-top:6px;">
-                    <input class="ds-input" id="s-quick-amt" type="number" placeholder="পরিমাণ (যেমন: 500)">
+                    <input class="ds-input" id="s-quick-amt" type="text" inputmode="decimal" placeholder="পরিমাণ (যেমন: 500)">
                     <input class="ds-input" id="s-quick-qty" type="number" value="1" style="width:50px;">
                   </div>
                 </div>`;
               const qAmt = cartContainer.querySelector('#s-quick-amt');
               const qQty = cartContainer.querySelector('#s-quick-qty');
               const syncQuick = () => {
-                const total = (Number(qAmt.value || 0) * Number(qQty.value || 1));
+                const total = (parseAmount(qAmt?.value) * (parseAmount(qQty?.value) || 1));
                 payEl.value = String(total);
               };
               qAmt?.addEventListener('input', syncQuick);
@@ -991,14 +1084,14 @@
             const total = calcTotal();
             cartContainer.innerHTML = `
               <table class="ds-cart-table">
-                <thead><tr><th>আইটেম</th><th style="width:50px;">Qty</th><th style="width:70px;">দর</th><th>মোট</th><th style="width:24px;"></th></tr></thead>
+                <thead><tr><th>আইটেম</th><th style="width:50px;">Qty</th><th style="width:75px;">দর</th><th>মোট</th><th style="width:24px;"></th></tr></thead>
                 <tbody>
                   ${cart.map((it, idx) => `
                     <tr>
                       <td style="font-weight:700;">${esc(it.name)}</td>
                       <td><input class="ds-cart-qty-input" data-idx="${idx}" type="number" min="1" max="999" value="${it.qty}"></td>
-                      <td><input class="ds-cart-price-input" data-idx="${idx}" type="number" value="${it.price}"></td>
-                      <td style="font-weight:700;color:var(--ds-accent);">${fmt(it.price * it.qty)}</td>
+                      <td><input class="ds-cart-price-input" data-idx="${idx}" type="text" inputmode="decimal" value="${it.price}"></td>
+                      <td class="ds-row-total" style="font-weight:700;color:var(--ds-accent);">${fmt(it.price * it.qty)}</td>
                       <td><button class="ds-cart-remove-btn" data-del="${idx}" type="button">✕</button></td>
                     </tr>
                   `).join('')}
@@ -1006,7 +1099,7 @@
               </table>
               <div class="ds-cart-total-box">
                 <span>মোট বিল:</span>
-                <span class="ds-green" style="font-size:13px;">${fmt(total)}</span>
+                <span class="ds-green ds-grand-total" style="font-size:13px;">${fmt(total)}</span>
               </div>`;
 
             payEl.value = String(total);
@@ -1014,16 +1107,30 @@
             cartContainer.querySelectorAll('.ds-cart-qty-input').forEach(inp => {
               inp.addEventListener('input', (e) => {
                 const idx = Number(e.target.dataset.idx);
-                cart[idx].qty = Math.max(1, Number(e.target.value) || 1);
-                updateCartUI();
+                cart[idx].qty = Math.max(1, Math.round(parseAmount(e.target.value)) || 1);
+                const tr = e.target.closest('tr');
+                if (tr) {
+                  const lineTotalEl = tr.querySelector('.ds-row-total');
+                  if (lineTotalEl) lineTotalEl.textContent = fmt(cart[idx].price * cart[idx].qty);
+                }
+                const grandTotalEl = cartContainer.querySelector('.ds-grand-total');
+                if (grandTotalEl) grandTotalEl.textContent = fmt(calcTotal());
+                payEl.value = String(calcTotal());
               });
             });
 
             cartContainer.querySelectorAll('.ds-cart-price-input').forEach(inp => {
               inp.addEventListener('input', (e) => {
                 const idx = Number(e.target.dataset.idx);
-                cart[idx].price = Math.max(0, Number(e.target.value) || 0);
-                updateCartUI();
+                cart[idx].price = Math.max(0, parseAmount(e.target.value));
+                const tr = e.target.closest('tr');
+                if (tr) {
+                  const lineTotalEl = tr.querySelector('.ds-row-total');
+                  if (lineTotalEl) lineTotalEl.textContent = fmt(cart[idx].price * cart[idx].qty);
+                }
+                const grandTotalEl = cartContainer.querySelector('.ds-grand-total');
+                if (grandTotalEl) grandTotalEl.textContent = fmt(calcTotal());
+                payEl.value = String(calcTotal());
               });
             });
 
@@ -1112,15 +1219,15 @@
                 notes: (ov.querySelector('#sn').value || '').trim()
               };
             } else {
-              const qAmt = Number(cartContainer.querySelector('#s-quick-amt')?.value || 0);
-              const qQty = Number(cartContainer.querySelector('#s-quick-qty')?.value || 1);
+              const qAmt = parseAmount(cartContainer.querySelector('#s-quick-amt')?.value || 0);
+              const qQty = Math.max(1, Math.round(parseAmount(cartContainer.querySelector('#s-quick-qty')?.value || 1)));
               if (!(qAmt > 0)) { toast('প্রোডাক্ট যোগ করুন বা পরিমাণ দিন'); return; }
               totalAmount = qAmt * qQty;
               salePayload = {
                 customer_id: c.id,
                 amount: totalAmount,
                 qty: qQty,
-                payment_amount: Number(payEl.value || 0),
+                payment_amount: parseAmount(payEl.value || 0),
                 payment_method: ov.querySelector('#sm').value || 'Cash',
                 sale_date: ov.querySelector('#sdt').value || today,
                 payment_date: ov.querySelector('#spdt').value || today,
@@ -1131,7 +1238,7 @@
 
             const res = await apiPost('ajax_quick_sale', salePayload);
             if (res && res.ok) {
-              const paymentAmount = Number(payEl.value || 0);
+              const paymentAmount = parseAmount(payEl.value || 0);
               const dueAmount = Math.max(0, totalAmount - paymentAmount);
               const invoiceNo = res.invoice_no || `INV-${res.sale_id}`;
               const company = _bootInfo?.company_name || 'Digital Store';
@@ -1206,7 +1313,7 @@
           const psBtn = ov.querySelector('#ps');
           psBtn.onclick = async () => {
             if (psBtn.disabled) return;
-            const amt = Number(ov.querySelector('#pa').value || 0);
+            const amt = parseAmount(ov.querySelector('#pa').value || 0);
             if (!(amt > 0)) { toast('পরিমাণ দিন'); return; }
             psBtn.disabled = true;
             try {
@@ -1386,13 +1493,15 @@
         const t = pendingTasks.find(x => x.id === tid);
         if (!t || !guardWrite()) return;
         modal('ডেলিভারি — ' + esc(t.task_name), `
-          <div class="ds-soft-banner">কাজ: <b>${esc(t.task_name)}</b> • মূল্য: <b>${fmt(t.amount)}</b></div>
+          <div class="ds-soft-banner">কাজ: <b>${esc(t.task_name)}</b></div>
           <div class="ds-row">
-            <div class="ds-field"><label class="ds-label">পেমেন্ট</label>
-              <input class="ds-input" id="td-pay" inputmode="decimal" value="${fmt(t.amount)}" placeholder="0"></div>
-            <div class="ds-field"><label class="ds-label">পদ্ধতি</label>
-              <select class="ds-select" id="td-method"><option>Cash</option><option>bKash</option><option>Nagad</option><option>Bank</option><option>Other</option></select></div>
+            <div class="ds-field"><label class="ds-label">মূল্য / রেট (৳)</label>
+              <input class="ds-input" id="td-amt" inputmode="decimal" value="${t.amount}"></div>
+            <div class="ds-field"><label class="ds-label">পেমেন্ট গ্রহণ (৳)</label>
+              <input class="ds-input" id="td-pay" inputmode="decimal" value="${t.amount}" placeholder="0"></div>
           </div>
+          <div class="ds-field"><label class="ds-label">পেমেন্ট পদ্ধতি</label>
+            <select class="ds-select" id="td-method"><option>Cash</option><option>bKash</option><option>Nagad</option><option>Bank</option><option>Other</option></select></div>
           <div class="ds-quick-fill-row">
             <button class="ds-chip-btn" type="button" id="td-full">Full Paid</button>
             <button class="ds-chip-btn" type="button" id="td-due">Due Sale</button>
@@ -1413,13 +1522,23 @@
             const today = new Date().toISOString().slice(0, 10);
             ov.querySelector('#td-sdt').value = today;
             ov.querySelector('#td-pdt').value = today;
-            ov.querySelector('#td-full').onclick = () => { ov.querySelector('#td-pay').value = fmt(t.amount); };
-            ov.querySelector('#td-due').onclick = () => { ov.querySelector('#td-pay').value = '0'; };
+            const amtInp = ov.querySelector('#td-amt');
+            const payInp = ov.querySelector('#td-pay');
+            ov.querySelector('#td-full').onclick = () => { payInp.value = amtInp.value; };
+            ov.querySelector('#td-due').onclick = () => { payInp.value = '0'; };
+            amtInp.addEventListener('input', () => {
+              if (parseAmount(payInp.value) === parseAmount(t.amount)) {
+                payInp.value = amtInp.value;
+              }
+            });
             ov.querySelector('#td-cancel').onclick = close;
             ov.querySelector('#td-save').onclick = async () => {
+              const finalAmt = parseAmount(amtInp.value || t.amount);
+              const finalPay = parseAmount(payInp.value || 0);
               const res = await apiPost('ajax_task_deliver', {
                 task_id: t.id,
-                payment_amount: Number(ov.querySelector('#td-pay').value || 0),
+                amount: finalAmt,
+                payment_amount: finalPay,
                 payment_method: ov.querySelector('#td-method').value || 'Cash',
                 sale_date: ov.querySelector('#td-sdt').value || today,
                 payment_date: ov.querySelector('#td-pdt').value || today,
@@ -1431,8 +1550,8 @@
                   meta: esc(t.task_name),
                   items: [
                     { label: 'Invoice', value: String(res.invoice_no || '') },
-                    { label: 'Amount', value: fmt(t.amount) },
-                    { label: 'Paid', value: fmt(Number(ov.querySelector('#td-pay').value || 0)) },
+                    { label: 'Amount', value: fmt(finalAmt) },
+                    { label: 'Paid', value: fmt(finalPay) },
                   ]
                 });
                 close(); toast('ডেলিভারি সম্পন্ন'); await loadSafe(panel, id);
@@ -1450,7 +1569,7 @@
         modal('কাজ এডিট', `
           <div class="ds-field"><label class="ds-label">কাজের নাম</label>
             <input class="ds-input" id="te-name" value="${esc(t.task_name)}"></div>
-          <div class="ds-field"><label class="ds-label">মূল্য</label>
+          <div class="ds-field"><label class="ds-label">মূল্য / রেট (৳)</label>
             <input class="ds-input" id="te-amt" inputmode="decimal" value="${t.amount}"></div>
           <div class="ds-field"><label class="ds-label">বিস্তারিত নোট</label>
             <textarea class="ds-textarea" id="te-notes" rows="5" style="min-height:100px;">${esc(t.notes || '')}</textarea></div>
@@ -1463,10 +1582,11 @@
             ov.querySelector('#te-save').onclick = async () => {
               const name = (ov.querySelector('#te-name').value || '').trim();
               if (!name) { toast('কাজের নাম দিন'); return; }
+              const finalAmt = parseAmount(ov.querySelector('#te-amt').value || 0);
               const res = await apiPost('ajax_task_update', {
                 task_id: t.id,
                 task_name: name,
-                amount: Number(ov.querySelector('#te-amt').value || 0),
+                amount: finalAmt,
                 notes: (ov.querySelector('#te-notes').value || '').trim(),
               });
               if (res.ok) { close(); toast('আপডেট হয়েছে'); await loadSafe(panel, id); }
@@ -1596,6 +1716,16 @@
       openTaskAddModal(panel, c, id, flowKey, canWrite);
     });
 
+    // ── Auto-detected application handlers ────────────────────────────────────
+    aEl.querySelector('#ds-detected-add')?.addEventListener('click', () => {
+      if (!guardWrite()) return;
+      openTaskAddModal(panel, c, id, flowKey, canWrite, detectedApp);
+    });
+    aEl.querySelector('#ds-detected-open')?.addEventListener('click', () => {
+      if (!guardWrite()) return;
+      openTaskAddModal(panel, c, id, flowKey, canWrite, detectedApp);
+    });
+
     // ── Tasks button (inline & KPI box) ──────────────────────────────────────
     const handleTasksClick = () => {
       if (pendingTaskCount > 0) {
@@ -1642,19 +1772,40 @@
       </div>`;
   }
 
-  function openTaskAddModal(panel, c, id, flowKey, canWrite) {
+  function openTaskAddModal(panel, c, id, flowKey, canWrite, initialApp = null) {
     let selProduct = { id: null, name: '', price: 0 };
+    let currentApp = initialApp;
+
     modal('নতুন কাজ যোগ', `
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+        <button class="ds-chip-btn" id="ta-btn-autofill" type="button" style="background:var(--ds-accent);color:#fff;">⚡ চ্যাট থেকে অটোফিল</button>
+        <button class="ds-chip-btn" id="ta-btn-paste" type="button">📋 টেক্সট পেস্ট করুন</button>
+      </div>
+      <div id="ta-paste-box" class="ds-hidden" style="margin-bottom:10px;background:var(--ds-bg2);padding:8px;border-radius:8px;border:1px solid var(--ds-border);">
+        <textarea class="ds-textarea" id="ta-paste-input" rows="3" placeholder="কাস্টমারের পাঠানো মেসেজ এখানে পেস্ট করুন..."></textarea>
+        <button class="ds-btn ds-btn-sm ds-btn-block" type="button" id="ta-paste-apply" style="margin-top:5px;">অটোফিল করুন</button>
+      </div>
       <div class="ds-field"><label class="ds-label">প্রোডাক্ট / সার্ভিস</label>
-        <input class="ds-input" id="ta-pq" placeholder="নাম বা SKU দিয়ে খুঁজুন">
+        <input class="ds-input" id="ta-pq" placeholder="নাম বা SKU দিয়ে খুঁজুন (যেমন: New Birth)">
         <div class="ds-suggest" id="ta-ps"></div></div>
       <div class="ds-field"><label class="ds-label">কাজের নাম *</label>
-        <input class="ds-input" id="ta-name" placeholder="যেমন: ওয়েবসাইট ডিজাইন"></div>
-      <div class="ds-field"><label class="ds-label">মূল্য</label>
-        <input class="ds-input" id="ta-amt" inputmode="decimal" placeholder="0"></div>
+        <input class="ds-input" id="ta-name" placeholder="যেমন: New Birth - DR. MD. NAJEEBUR RAHMAN (265979535)"></div>
+      <div class="ds-field"><label class="ds-label">মূল্য / রেট (৳)</label>
+        <input class="ds-input" id="ta-amt" inputmode="decimal" placeholder="0">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:5px;cursor:pointer;">
+          <input type="checkbox" id="ta-save-custom-rate">
+          <span>এই কাস্টমারের জন্য এই রেট সেভ রাখুন (Custom Rate)</span>
+        </label>
+      </div>
       <div class="ds-field"><label class="ds-label">বিস্তারিত নোট / ডেটা</label>
         <textarea class="ds-textarea" id="ta-notes" rows="5" style="min-height:100px;"
           placeholder="কাজের বিবরণ, ফাইল তথ্য, নির্দেশনা ইত্যাদি..."></textarea></div>
+      <div id="ta-rename-wrap" class="ds-hidden" style="margin-bottom:10px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;">
+          <input type="checkbox" id="ta-cust-rename" checked>
+          <span id="ta-rename-label">কাস্টমার নামও আপডেট করুন</span>
+        </label>
+      </div>
       <div class="ds-modal-actions">
         <button class="ds-btn ds-btn-secondary ds-btn-block" type="button" id="ta-cancel">বাতিল</button>
         <button class="ds-btn ds-btn-block" type="button" id="ta-save">সেভ</button>
@@ -1663,6 +1814,84 @@
         const pqEl = ov.querySelector('#ta-pq'), psEl = ov.querySelector('#ta-ps');
         const nameEl = ov.querySelector('#ta-name'), amtEl = ov.querySelector('#ta-amt');
         let searchTimer = null;
+
+        const applyAppToForm = async (app) => {
+          if (!app) return;
+          currentApp = app;
+
+          // Set task name
+          const taskTitle = (app.isBirth ? 'New Birth' : 'কাজ') +
+            (app.name ? ` - ${app.name}` : '') +
+            (app.appId ? ` (${app.appId})` : '');
+          nameEl.value = taskTitle;
+
+          // Build notes
+          const lines = [];
+          lines.push('আবেদনের তথ্য:');
+          if (app.appId) lines.push(`Application ID: ${app.appId}`);
+          if (app.nameBn) lines.push(`নাম (বাংলা): ${app.nameBn}`);
+          if (app.nameEn) lines.push(`Name (English): ${app.nameEn}`);
+          if (app.dob) lines.push(`Date of Birth: ${app.dob}`);
+          if (app.address) lines.push(`Office Address: ${app.address}`);
+          ov.querySelector('#ta-notes').value = lines.join('\n');
+
+          // If customer name is empty or phone number, suggest renaming
+          if (app.name && (!c.name || c.name === c.phone || /^\d+$/.test(c.name.trim()))) {
+            const renameWrap = ov.querySelector('#ta-rename-wrap');
+            const renameLabel = ov.querySelector('#ta-rename-label');
+            if (renameWrap && renameLabel) {
+              renameLabel.textContent = `কাস্টমার নাম "${app.name}" হিসেবে সেভ করুন`;
+              renameWrap.classList.remove('ds-hidden');
+            }
+          }
+
+          // Auto lookup product price (e.g. New Birth)
+          const searchKeyword = app.isBirth ? 'New Birth' : 'Birth';
+          pqEl.value = searchKeyword;
+          try {
+            const res = await apiGet('ajax_products_lookup', { q: searchKeyword, customer_id: c.id });
+            if (res.ok && Array.isArray(res.products) && res.products.length > 0) {
+              const p = res.products.find(x => x.name.toLowerCase().includes('new birth')) || res.products[0];
+              selProduct = { id: p.id, name: p.name, price: Number(p.price || 0) };
+              pqEl.value = p.name;
+              amtEl.value = String(p.price);
+            } else if (!amtEl.value || amtEl.value === '0') {
+              amtEl.value = '650';
+            }
+          } catch {
+            if (!amtEl.value || amtEl.value === '0') amtEl.value = '650';
+          }
+          toast('অটোফিল সফল হয়েছে!');
+        };
+
+        ov.querySelector('#ta-btn-autofill')?.addEventListener('click', async () => {
+          const app = detectChatApplication();
+          if (app) {
+            await applyAppToForm(app);
+          } else {
+            toast('চ্যাটে কোনো আবেদন বার্তা পাওয়া যায়নি। পেস্ট বাটন ব্যবহার করুন।');
+          }
+        });
+
+        ov.querySelector('#ta-btn-paste')?.addEventListener('click', () => {
+          ov.querySelector('#ta-paste-box')?.classList.toggle('ds-hidden');
+        });
+
+        ov.querySelector('#ta-paste-apply')?.addEventListener('click', async () => {
+          const raw = ov.querySelector('#ta-paste-input')?.value || '';
+          const parsed = parseApplicationText(raw);
+          if (parsed) {
+            await applyAppToForm(parsed);
+            ov.querySelector('#ta-paste-box')?.classList.add('ds-hidden');
+          } else {
+            toast('মেসেজটি সঠিক ফরম্যাটে নেই (Application ID, Name ইত্যাদি দিন)');
+          }
+        });
+
+        if (initialApp) {
+          applyAppToForm(initialApp);
+        }
+
         const doSearch = async () => {
           const q = pqEl.value.trim();
           if (!q) { psEl.innerHTML = ''; return; }
@@ -1693,19 +1922,33 @@
         ov.querySelector('#ta-save').onclick = async () => {
           const name = (nameEl.value || '').trim();
           if (!name) { toast('কাজের নাম দিন'); return; }
+          const finalAmount = parseAmount(amtEl.value || 0);
           const res = await apiPost('ajax_task_add', {
             customer_id: c.id,
             task_name: name,
-            amount: Number(amtEl.value || 0),
+            amount: finalAmount,
             notes: (ov.querySelector('#ta-notes').value || '').trim(),
           });
           if (res.ok) {
+            if (ov.querySelector('#ta-save-custom-rate')?.checked && selProduct.id) {
+              apiPost('ajax_custom_price_save', {
+                customer_id: c.id,
+                product_id: selProduct.id,
+                custom_price: finalAmount,
+              }).catch(() => {});
+            }
+            if (ov.querySelector('#ta-cust-rename')?.checked && currentApp && currentApp.name) {
+              apiPost('ajax_customer_update', {
+                customer_id: c.id,
+                name: currentApp.name,
+              }).catch(() => {});
+            }
             setWorkflowState(flowKey, {
               kind: 'info', title: 'কাজ যোগ হয়েছে',
               meta: 'Pending task',
               items: [
                 { label: 'কাজ', value: name },
-                { label: 'মূল্য', value: fmt(Number(amtEl.value || 0)) },
+                { label: 'মূল্য', value: fmt(finalAmount) },
               ]
             });
             close(); toast('কাজ যোগ হয়েছে'); await loadSafe(panel, id);
