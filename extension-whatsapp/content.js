@@ -2247,7 +2247,7 @@
         <textarea class="ds-textarea" id="sel-notes" rows="2" placeholder="রেট বা কাজের বিবরণ..."></textarea></div>
       <div class="ds-modal-actions">
         <button class="ds-btn ds-btn-secondary ds-btn-block" type="button" id="sel-c">বাতিল</button>
-        <button class="ds-btn ds-btn-block" type="button" id="sel-s">সেভ করুন</button>
+        <button class="ds-btn ds-btn-primary ds-btn-block" type="button" id="sel-s">সেভ করুন</button>
       </div>`,
       (ov, close) => {
         ov.querySelector('#sel-c').onclick = close;
@@ -2260,14 +2260,20 @@
           if (!name || !phone) { toast('সেলার নাম ও WhatsApp নম্বর আবশ্যক'); return; }
           saveBtn.disabled = true;
           saveBtn.textContent = 'সেভ হচ্ছে...';
-          const res = await apiPost('ajax_sellers', { name, phone, service_type: st, notes });
-          if (res && res.ok && res.seller) {
-            toast('সেলার সফলভাবে সেভ হয়েছে');
-            await fetchSellers(true);
-            close();
-            if (typeof onDone === 'function') onDone(res.seller);
-          } else {
-            toast(esc(res?.error || 'ব্যর্থ'));
+          try {
+            const res = await apiPost('ajax_sellers', { name, phone, service_type: st, notes });
+            if (res && res.ok && res.seller) {
+              toast('সেলার সফলভাবে সেভ হয়েছে');
+              await fetchSellers(true);
+              close();
+              if (typeof onDone === 'function') onDone(res.seller);
+            } else {
+              toast(esc(res?.error || 'সেলার সেভ করতে ব্যর্থ'));
+              saveBtn.disabled = false;
+              saveBtn.textContent = 'সেভ করুন';
+            }
+          } catch (err) {
+            toast('অনুরোধ ব্যর্থ হয়েছে');
             saveBtn.disabled = false;
             saveBtn.textContent = 'সেভ করুন';
           }
@@ -2467,7 +2473,7 @@
         let availableSellers = [];
 
         const populateSellers = async (selectId = null) => {
-          availableSellers = await fetchSellers();
+          availableSellers = await fetchSellers(true);
           if (!sellerSelect) return;
           sellerSelect.innerHTML = '<option value="">— সেলার ছাড়া সেভ করুন —</option>' +
             availableSellers.map(s => `
