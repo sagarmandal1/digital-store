@@ -525,6 +525,26 @@ require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR .
                 document.getElementById('notifyMessage').value = `Payment Due Reminder\nInvoice: ${invoiceNo}\nCustomer: ${customerName}\nDue: ${fmtMoney(due)}\n`;
             });
         });
+
+        // ── Fix: remove backdrop & body state BEFORE form submits cause a reload ──
+        function stripModalArtifacts() {
+            document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+        }
+        document.querySelectorAll('#notifyModal form, #collectModal form').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                // Hide Bootstrap modal instance first to prevent double-backdrop on next page
+                ['notifyModal', 'collectModal'].forEach(function (id) {
+                    try {
+                        var m = bootstrap.Modal.getInstance(document.getElementById(id));
+                        if (m) m.hide();
+                    } catch (e) { /* */ }
+                });
+                stripModalArtifacts();
+            });
+        });
     })();
 </script>
 

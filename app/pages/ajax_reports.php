@@ -22,7 +22,6 @@ $from = trim((string)($_GET['from'] ?? ''));
 $to = trim((string)($_GET['to'] ?? ''));
 $group = strtolower(trim((string)($_GET['group'] ?? 'day')));
 $preset = strtolower(trim((string)($_GET['preset'] ?? '')));
-$adminId = app_scope_admin_id();
 
 if ($from === '' && $to === '' && $preset !== 'lifetime') {
     $from = (new DateTimeImmutable('first day of this month'))->format('Y-m-d');

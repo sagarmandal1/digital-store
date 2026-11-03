@@ -120,6 +120,18 @@ try {
     $notesStmt->execute([':cid' => $cid, ':aid' => $aid]);
     $notes = $notesStmt->fetchAll() ?: [];
 
+    // Pending tasks
+    app_ensure_customer_tasks_table();
+    $tasksStmt = db()->prepare("
+        SELECT id, task_name, notes, amount, status, sale_id, created_at, delivered_at
+        FROM customer_tasks
+        WHERE customer_id = :cid AND (admin_id = :aid OR :aid = 0) AND status = 'pending'
+        ORDER BY created_at DESC
+        LIMIT 20
+    ");
+    $tasksStmt->execute([':cid' => $cid, ':aid' => $aid]);
+    $pendingTasks = $tasksStmt->fetchAll() ?: [];
+
     echo json_encode([
         'ok' => true,
         'found' => true,
@@ -136,6 +148,17 @@ try {
             'total_paid' => $paid,
             'total_due' => $due,
         ],
+        'pending_task_count' => count($pendingTasks),
+        'pending_tasks' => array_map(function ($t) {
+            return [
+                'id' => (int)$t['id'],
+                'task_name' => (string)$t['task_name'],
+                'notes' => (string)($t['notes'] ?? ''),
+                'amount' => to_float($t['amount']),
+                'status' => (string)$t['status'],
+                'created_at' => (string)$t['created_at'],
+            ];
+        }, $pendingTasks),
         'recent_sales' => array_map(function ($s) {
             return [
                 'id' => (int)$s['id'],

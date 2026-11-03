@@ -1,0 +1,23 @@
+# Database files
+storage/*.sqlite
+storage/*.sqlite*
+storage/*.backup*
+storage/database.pre-service-upgrade*
+
+# Logs and sessions
+*.log
+storage/*.log
+storage/sessions/
+storage/logs/
+
+# Environment and secrets
+.env
+.env.*
+
+# Saved browser pages
+WhatsApp Business.html
+WhatsApp Business_files/
+
+# OS files
+.DS_Store
+Thumbs.db

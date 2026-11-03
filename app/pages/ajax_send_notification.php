@@ -24,6 +24,7 @@ $data = json_decode(is_string($body) ? $body : '', true) ?: [];
 
 $customerId = (int)($data['customer_id'] ?? 0);
 $type = trim((string)($data['type'] ?? ''));
+$includePaymentInfo = !empty($data['include_payment_info']);
 
 if ($customerId <= 0 || !in_array($type, ['due_reminder', 'summary'], true)) {
     app_ext_api_send_json(400, ['ok' => false, 'error' => 'customer_id and type required']);
@@ -83,6 +84,13 @@ if ($type === 'due_reminder') {
 
 if ($message === '') {
     app_ext_api_send_json(500, ['ok' => false, 'error' => 'Could not generate message']);
+}
+
+if ($includePaymentInfo && $type === 'due_reminder') {
+    $payInfo = trim(app_setting_for_admin_id($aid, 'payment_info', ''));
+    if ($payInfo !== '') {
+        $message .= "\n\n" . $payInfo;
+    }
 }
 
 $res = whatsapp_send_text_for_admin_id($aid, $phone, $message);

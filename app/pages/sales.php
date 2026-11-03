@@ -146,6 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'create') {
         }
         $productId = (int)($r['product_id'] ?? 0);
         $qty = (int)($r['qty'] ?? 0);
+        $manualSellInput = $r['sell_price'] ?? null;
         if ($productId <= 0 || $qty <= 0) {
             continue;
         }
@@ -153,19 +154,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'create') {
         if (!$p) {
             continue;
         }
+
+        $effectiveSell = $p['sell_price'];
+        if ($manualSellInput !== null && $manualSellInput !== '') {
+            $effectiveSell = max(0.0, to_float($manualSellInput));
+        }
+
         $lineCost = $p['cost_price'] * $qty;
-        $lineSell = $p['sell_price'] * $qty;
+        $lineSell = $effectiveSell * $qty;
+        $isManualPrice = abs($effectiveSell - $p['sell_price']) > 0.00001;
         $items[] = [
             'product_id' => $p['product_id'],
             'name' => $p['name'],
             'sku' => $p['sku'],
             'qty' => $qty,
             'cost_price' => $p['cost_price'],
-            'sell_price' => $p['sell_price'],
+            'sell_price' => $effectiveSell,
             'line_cost' => $lineCost,
             'line_sell' => $lineSell,
             'line_profit' => $lineSell - $lineCost,
-            'is_custom' => $p['is_custom'],
+            'is_custom' => ($p['is_custom'] || $isManualPrice),
         ];
         $totalCost += $lineCost;
         $totalSell += $lineSell;
@@ -392,7 +400,7 @@ require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR .
                     </select>
                 </td>
                 <td><input class="form-control form-control-sm text-end qtyInp" name="items[${idx}][qty]" type="number" min="1" step="1" value="1" required></td>
-                <td><input class="form-control form-control-sm text-end sellInp" type="number" step="0.01" min="0" value="0" readonly></td>
+                <td><input class="form-control form-control-sm text-end sellInp" name="items[${idx}][sell_price]" type="number" step="0.01" min="0" value="0" required></td>
                 <td class="text-end fw-semibold lineTotal">0.00</td>
                 <td class="text-end"><button class="btn btn-sm btn-outline-danger delBtn" type="button">X</button></td>
             `;
@@ -412,6 +420,10 @@ require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR .
             tr.querySelector('.qtyInp').addEventListener('input', () => {
                 recalcTotals();
             });
+
+            tr.querySelector('.sellInp').addEventListener('input', () => {
+                recalcTotals();
+            });
         }
 
         function renumberRows() {
@@ -419,6 +431,7 @@ require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR .
             rows.forEach((tr, idx) => {
                 tr.querySelector('.productSel').setAttribute('name', `items[${idx}][product_id]`);
                 tr.querySelector('.qtyInp').setAttribute('name', `items[${idx}][qty]`);
+                tr.querySelector('.sellInp').setAttribute('name', `items[${idx}][sell_price]`);
             });
         }
 

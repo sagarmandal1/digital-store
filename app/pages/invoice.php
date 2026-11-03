@@ -304,6 +304,24 @@ require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR .
 
 <style>
     .ls-1 { letter-spacing: 0.05rem; }
+
+    /* Invoice must stay fully visible even if any global reveal/overlay state leaks in. */
+    #invoiceCard,
+    #invoiceCard .card-body,
+    #invoiceCard .table,
+    #invoiceCard .table * {
+        opacity: 1 !important;
+        filter: none !important;
+        visibility: visible !important;
+    }
+
+    #invoiceCard.reveal-item,
+    #invoiceCard .reveal-item {
+        animation: none !important;
+        transform: none !important;
+        opacity: 1 !important;
+    }
+
     @media print {
         @page { margin: 0; }
         body { margin: 1.6cm; background: #fff !important; }
@@ -736,6 +754,28 @@ require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR .
                 document.getElementById('editPaymentNote').value = btn.getAttribute('data-note');
             });
         });
+
+        // ── Fix: strip Bootstrap modal artifacts before form submit causes reload ──
+        (function () {
+            function stripModalArtifacts() {
+                document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+            var modalEl = document.getElementById('editPaymentModal');
+            if (modalEl) {
+                modalEl.querySelectorAll('form').forEach(function (form) {
+                    form.addEventListener('submit', function () {
+                        try {
+                            var m = bootstrap.Modal.getInstance(modalEl);
+                            if (m) m.hide();
+                        } catch (e) { /* */ }
+                        stripModalArtifacts();
+                    });
+                });
+            }
+        })();
     })();
 </script>
 

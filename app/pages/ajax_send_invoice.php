@@ -23,6 +23,7 @@ $body = file_get_contents('php://input');
 $data = json_decode(is_string($body) ? $body : '', true) ?: [];
 
 $saleId = (int)($data['sale_id'] ?? 0);
+$includePaymentInfo = !empty($data['include_payment_info']);
 if ($saleId <= 0) {
     app_ext_api_send_json(400, ['ok' => false, 'error' => 'sale_id required']);
 }
@@ -66,6 +67,13 @@ try {
                "• বকেয়া: " . money_fmt($due, $currency) . "\n\n" .
                "ধন্যবাদ,\n" .
                "{$company}";
+
+    if ($includePaymentInfo) {
+        $payInfo = trim(app_setting_for_admin_id($aid, 'payment_info', ''));
+        if ($payInfo !== '') {
+            $message .= "\n\n" . $payInfo;
+        }
+    }
 
     $res = whatsapp_send_text_for_admin_id($aid, $phone, $message);
     if (!($res['ok'] ?? false) && $tokenAdminId === 1 && $aid !== 1) {

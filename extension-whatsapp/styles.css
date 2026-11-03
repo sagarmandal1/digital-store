@@ -1,54 +1,145 @@
-/* ── CSS Variables (scoped to panel) ─────────────────────────────────────── */
-#ds-wa-panel {
-  --bg: #0f1117;
-  --surface: #181c27;
-  --surface2: #1e2333;
-  --border: rgba(255, 255, 255, .07);
-  --border2: rgba(255, 255, 255, .13);
-  --accent: #00e5a0;
-  --accent2: #00b37e;
-  --accent-bg: rgba(0, 229, 160, .08);
-  --text: #eef0f6;
-  --text2: #8b90a0;
-  --text3: #4e5468;
-  --red: #ff5f70;
-  --green: #00e5a0;
-  --warn: #ffb347;
-  --r: 12px;
-  --r-sm: 7px;
+/* ── Digital Store – WhatsApp CRM Styles 2.0 (Modern UI/UX) ──────────────── */
+
+/* ── GLOBAL INJECTED WHATSAPP BADGES (OUTSIDE PANEL) ──────────────────────── */
+.ds-chat-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 2px 7px !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  margin-left: 8px !important;
+  vertical-align: middle !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  letter-spacing: 0.02em !important;
+  box-sizing: border-box !important;
 }
 
-/* ── Panel shell ─────────────────────────────────────────────────────────── */
+.ds-chat-badge-due {
+  background: #ffe4e6 !important;
+  color: #e11d48 !important;
+  border: 1px solid #fecdd3 !important;
+  box-shadow: 0 1px 3px rgba(225, 29, 72, 0.15) !important;
+}
+
+/* Active Chat Top Header Badge (Next to contact title in #main header) */
+.ds-header-chat-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 3px 10px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  margin-left: 10px !important;
+  vertical-align: middle !important;
+  line-height: 1.3 !important;
+  white-space: nowrap !important;
+  background: #fff1f2 !important;
+  color: #e11d48 !important;
+  border: 1px solid #f43f5e !important;
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.25) !important;
+  cursor: pointer !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* ── CSS Variables (scoped to panel) ─────────────────────────────────────── */
+#ds-wa-panel {
+  --bg: #0b0f19;
+  --surface: #111827;
+  --surface2: #1e293b;
+  --surface3: #334155;
+  --surface-glass: rgba(17, 24, 39, 0.85);
+  --border: rgba(255, 255, 255, 0.08);
+  --border2: rgba(255, 255, 255, 0.15);
+  --border-focus: rgba(16, 185, 129, 0.5);
+  
+  --accent: #10b981;
+  --accent-hover: #059669;
+  --accent-glow: rgba(16, 185, 129, 0.25);
+  --accent-bg: rgba(16, 185, 129, 0.12);
+  
+  --indigo: #6366f1;
+  --indigo-bg: rgba(99, 102, 241, 0.12);
+  --indigo-glow: rgba(99, 102, 241, 0.25);
+  
+  --text: #f8fafc;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --text-dim: #475569;
+  
+  --red: #f43f5e;
+  --red-bg: rgba(244, 63, 94, 0.12);
+  --green: #10b981;
+  --green-bg: rgba(16, 185, 129, 0.12);
+  --warn: #f59e0b;
+  --warn-bg: rgba(245, 158, 11, 0.12);
+  --blue: #38bdf8;
+  --blue-bg: rgba(56, 189, 248, 0.12);
+
+  --r: 16px;
+  --r-sm: 8px;
+  --r-xs: 5px;
+  --shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border);
+}
+
+/* ── Panel Shell ─────────────────────────────────────────────────────────── */
 #ds-wa-panel {
   position: fixed;
-  right: 14px;
-  top: 14px;
-  width: 300px;
-  max-height: calc(100vh - 28px);
+  right: 18px;
+  top: 18px;
+  width: 320px;
+  max-height: calc(100vh - 36px);
   background: var(--bg);
   color: var(--text);
   border-radius: var(--r);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .65), 0 0 0 1px var(--border);
+  box-shadow: var(--shadow);
   z-index: 2147483647;
   display: flex;
   flex-direction: column;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 12px;
+  line-height: 1.45;
   overflow: hidden;
-  /* clips the modal-wrap to panel bounds */
-  transition: box-shadow .2s, opacity .25s, transform .25s cubic-bezier(.4, 0, .2, 1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  transition: box-shadow .25s ease, opacity .25s ease, transform .25s cubic-bezier(.34, 1.56, .64, 1);
   user-select: none;
+  box-sizing: border-box;
+}
+
+#ds-wa-panel * {
+  box-sizing: border-box;
 }
 
 #ds-wa-panel.ds-hidden {
-  transform: translateX(320px);
+  transform: translateX(360px) scale(0.95);
   opacity: 0;
   pointer-events: none;
 }
 
 #ds-wa-panel.ds-dragging {
-  box-shadow: 0 28px 80px rgba(0, 0, 0, .8), 0 0 0 1px var(--border2);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--accent);
   transition: box-shadow .1s;
+}
+
+/* ── Resize Handle ───────────────────────────────────────────────────────── */
+.ds-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 100;
+  background: transparent;
+  transition: background .15s;
+}
+
+.ds-resize-handle:hover {
+  background: rgba(16, 185, 129, 0.4);
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
@@ -56,11 +147,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 11px 14px 10px;
-  background: var(--surface);
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #064e3b 100%);
   border-bottom: 1px solid var(--border);
   cursor: grab;
   flex-shrink: 0;
+  position: relative;
 }
 
 .ds-header:active {
@@ -77,67 +169,107 @@
 .ds-logo-dot {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
-  background: var(--accent);
+  border-radius: 7px;
+  background: linear-gradient(135deg, #10b981, #059669);
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 4px 10px var(--accent-glow);
   flex-shrink: 0;
 }
 
+.ds-title-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
 .ds-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.2px;
+  line-height: 1.2;
 }
 
 .ds-title-sub {
   font-size: 9px;
-  color: var(--text3);
+  color: #34d399;
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: .08em;
+  font-weight: 700;
 }
 
 .ds-header-actions {
   display: flex;
+  align-items: center;
   gap: 5px;
 }
 
 .ds-icon-btn,
 .ds-refresh-btn,
+.ds-search-toggle-btn,
 .ds-close {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border);
   color: var(--text2);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--r-sm);
-  transition: all .15s;
+  transition: all .15s ease;
   padding: 0;
   flex-shrink: 0;
 }
 
+.ds-search-toggle-btn:hover,
 .ds-refresh-btn:hover {
   background: var(--surface2);
   border-color: var(--border2);
-  color: var(--text);
+  color: #fff;
 }
 
 .ds-close:hover {
-  background: rgba(255, 95, 112, .12);
+  background: var(--red-bg);
   border-color: var(--red);
   color: var(--red);
 }
 
-/* ── Tabs ────────────────────────────────────────────────────────────────── */
+/* ── Inline Customer Quick Search ────────────────────────────────────────── */
+.ds-quick-search-bar {
+  padding: 8px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ds-quick-search-input {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+  font-size: 11.5px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.ds-quick-search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+/* ── Segmented Tabs ──────────────────────────────────────────────────────── */
 .ds-tabs {
   display: flex;
-  padding: 8px 12px 0;
-  gap: 2px;
+  padding: 6px 8px;
+  gap: 4px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -148,25 +280,37 @@
   padding: 6px 4px;
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
+  border-radius: var(--r-sm);
   cursor: pointer;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text3);
-  transition: all .15s;
+  transition: all .15s ease;
   letter-spacing: .02em;
-  margin-bottom: -1px;
   font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
 
 .ds-tab-btn:hover {
-  color: var(--text2);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .ds-tab-btn.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+  color: #ffffff;
+  background: var(--surface2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.ds-tab-btn.active span.ds-tab-indicator {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
 }
 
 /* ── Body ────────────────────────────────────────────────────────────────── */
@@ -174,118 +318,219 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 10px;
+  padding: 10px 12px;
   scrollbar-width: thin;
-  scrollbar-color: var(--surface2) transparent;
+  scrollbar-color: var(--surface3) transparent;
 }
 
 .ds-body::-webkit-scrollbar {
-  width: 3px;
+  width: 4px;
 }
 
 .ds-body::-webkit-scrollbar-thumb {
-  background: var(--surface2);
-  border-radius: 3px;
+  background: var(--surface3);
+  border-radius: 4px;
 }
 
 .ds-tab-content.ds-hidden {
-  display: none;
+  display: none !important;
 }
 
-/* ── Card ────────────────────────────────────────────────────────────────── */
+/* ── Card Component ──────────────────────────────────────────────────────── */
 .ds-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  transition: border-color .15s ease;
+}
+
+.ds-card:hover {
+  border-color: var(--border2);
+}
+
+/* ── Empty State ─────────────────────────────────────────────────────────── */
+.ds-empty {
+  text-align: center;
+  padding: 20px 14px;
+  color: var(--text3);
+  font-size: 11.5px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
   margin-bottom: 8px;
 }
 
-/* ── Customer info ───────────────────────────────────────────────────────── */
-.ds-customer-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
+.ds-empty-icon {
+  font-size: 24px;
+  display: block;
   margin-bottom: 6px;
+}
+
+/* ── Customer Profile Hero Card ──────────────────────────────────────────── */
+.ds-cust-hero {
   display: flex;
   align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 6px;
+}
+
+.ds-cust-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px var(--indigo-glow);
+}
+
+.ds-cust-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-customer-name {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ds-badge {
   font-size: 9px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 20px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
   background: var(--accent-bg);
   color: var(--accent);
-  border: 1px solid rgba(0, 229, 160, .18);
+  border: 1px solid rgba(16, 185, 129, 0.25);
   letter-spacing: .04em;
   text-transform: uppercase;
 }
 
 .ds-badge-vip {
-  background: rgba(255, 179, 71, .1);
+  background: var(--warn-bg);
   color: var(--warn);
-  border-color: rgba(255, 179, 71, .2);
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
 }
 
-/* ── Info rows — CRITICAL: SVG icon must be constrained ─────────────────── */
-.ds-info-row {
+/* ── Status Row & Pills ──────────────────────────────────────────────────── */
+.ds-status-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.ds-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.ds-unread-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+/* ── Contact Info Chips ──────────────────────────────────────────────────── */
+.ds-info-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.ds-info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 2.5px 6px;
+  border-radius: var(--r-xs);
+  font-size: 10.5px;
   color: var(--text2);
-  font-size: 11px;
-  margin-bottom: 3px;
-  line-height: 1.4;
+  transition: all 0.15s ease;
 }
 
-/* Force SVG icons to stay small — both class AND inline style */
-.ds-info-row svg,
-.ds-info-icon {
-  width: 13px !important;
-  height: 13px !important;
-  min-width: 13px !important;
-  min-height: 13px !important;
-  max-width: 13px !important;
-  max-height: 13px !important;
-  flex-shrink: 0;
-  opacity: .5;
-  display: block;
+.ds-info-chip:hover {
+  background: var(--surface3);
+  color: #fff;
 }
 
-/* ── KPIs ────────────────────────────────────────────────────────────────── */
+.ds-info-chip svg {
+  color: var(--text3);
+}
+
+/* ── KPI Grid ────────────────────────────────────────────────────────────── */
 .ds-kpis {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-  margin-top: 10px;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 10px;
 }
 
 .ds-kpi-box {
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  padding: 8px 6px;
-  text-align: center;
+  padding: 7px 9px;
+  transition: all .15s ease;
+}
+
+.ds-kpi-box:hover {
+  background: var(--surface3);
+  border-color: var(--border2);
 }
 
 .ds-kpi-label {
   font-size: 9px;
+  font-weight: 700;
   color: var(--text3);
   text-transform: uppercase;
-  letter-spacing: .04em;
-  margin-bottom: 3px;
-  font-weight: 600;
+  letter-spacing: .05em;
+  margin-bottom: 1px;
 }
 
 .ds-kpi-value {
   font-size: 13px;
   font-weight: 800;
   color: var(--text);
-  letter-spacing: -.01em;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .ds-kpi-value.green {
@@ -294,29 +539,112 @@
 
 .ds-kpi-value.red {
   color: var(--red);
+  text-shadow: 0 0 8px rgba(244, 63, 94, 0.3);
 }
 
-/* legacy aliases */
-.ds-kpi {
-  font-size: 13px;
-  font-weight: 800;
+.ds-kpi-value.orange {
+  color: var(--warn);
+}
+
+/* ── Quick Action Grid ───────────────────────────────────────────────────── */
+.ds-inline-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.ds-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 9px;
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s ease;
+  border: 1px solid transparent;
+  font-family: inherit;
+  outline: none;
+}
+
+.ds-btn:active {
+  transform: scale(0.97);
+}
+
+.ds-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.ds-btn-primary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  box-shadow: 0 4px 10px var(--accent-glow);
+}
+
+.ds-btn-primary:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
+.ds-btn-indigo {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: #fff;
+  box-shadow: 0 4px 10px var(--indigo-glow);
+}
+
+.ds-btn-indigo:hover {
+  background: linear-gradient(135deg, #4f46e5, #4338ca);
+}
+
+.ds-btn-outline {
+  background: var(--surface2);
+  border-color: var(--border);
   color: var(--text);
 }
 
-.ds-green {
-  color: var(--green) !important;
+.ds-btn-outline:hover {
+  background: var(--surface3);
+  border-color: var(--border2);
+  color: #fff;
 }
 
-.ds-red {
-  color: var(--red) !important;
+.ds-btn-secondary {
+  background: var(--surface2);
+  border-color: var(--border);
+  color: var(--text2);
 }
 
-/* ── Action bar ──────────────────────────────────────────────────────────── */
+.ds-btn-secondary:hover {
+  background: var(--surface3);
+  color: var(--text);
+}
+
+.ds-btn-warn {
+  background: var(--warn-bg);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--warn);
+}
+
+.ds-btn-warn:hover {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.ds-btn-block {
+  width: 100%;
+}
+
+/* ── Action Dropdown & Ledger Bar ─────────────────────────────────────────── */
 .ds-actionbar {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin: 8px 0 0;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+  position: relative;
 }
 
 .ds-menu-wrap {
@@ -324,233 +652,702 @@
   flex: 1;
 }
 
-/* ── Buttons ─────────────────────────────────────────────────────────────── */
-.ds-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 100%;
-  padding: 7px 11px;
-  border: none;
-  border-radius: var(--r-sm);
-  font-size: 11px;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all .15s;
-  letter-spacing: .02em;
-  text-decoration: none;
-  box-sizing: border-box;
-  white-space: nowrap;
-}
-
-.ds-btn-primary {
-  background: var(--accent);
-  color: #071a10;
-}
-
-.ds-btn-primary:hover {
-  background: #00f0aa;
-}
-
-.ds-btn-outline {
-  background: transparent;
-  border: 1px solid var(--border2);
-  color: var(--text2);
-}
-
-.ds-btn-outline:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-bg);
-}
-
-.ds-btn-secondary {
-  background: var(--surface2);
-  color: var(--text2);
-  border: 1px solid var(--border);
-}
-
-.ds-btn-secondary:hover {
-  border-color: var(--border2);
-  color: var(--text);
-}
-
-.ds-btn-block {
-  width: 100%;
-}
-
 .ds-menu-btn {
+  width: 100%;
   justify-content: space-between;
 }
 
-/* ── Dropdown ────────────────────────────────────────────────────────────── */
 .ds-menu {
   position: absolute;
+  top: calc(100% + 4px);
   left: 0;
   right: 0;
-  top: calc(100% + 5px);
-  background: var(--surface2);
+  background: var(--surface);
   border: 1px solid var(--border2);
-  border-radius: var(--r);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, .55);
-  z-index: 2147483647;
-  overflow: hidden;
-  animation: dsMenuIn .12s ease;
-}
-
-@keyframes dsMenuIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px)
-  }
-
-  to {
-    opacity: 1;
-    transform: none
-  }
-}
-
-.ds-menu.ds-hidden {
-  display: none;
+  border-radius: var(--r-sm);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--border2);
+  z-index: 500;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .ds-menu-item {
-  width: 100%;
-  border: none;
+  padding: 6px 9px;
   background: transparent;
-  padding: 8px 12px;
-  text-align: left;
-  cursor: pointer;
+  border: none;
+  border-radius: var(--r-xs);
+  color: var(--text);
   font-size: 11px;
   font-weight: 600;
-  color: var(--text2);
+  text-align: left;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-family: inherit;
-  transition: all .1s;
-  border-bottom: 1px solid var(--border);
-}
-
-.ds-menu-item:last-child {
-  border-bottom: none;
 }
 
 .ds-menu-item:hover {
-  background: var(--accent-bg);
+  background: var(--surface2);
   color: var(--accent);
 }
 
-/* ── Link ────────────────────────────────────────────────────────────────── */
-.ds-link {
-  color: var(--accent);
-  text-decoration: none;
-  font-size: 11px;
-  font-weight: 600;
+.ds-link-btn {
   padding: 6px 10px;
-  border: 1px solid rgba(0, 229, 160, .18);
+  background: var(--surface2);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
-  white-space: nowrap;
+  gap: 4px;
   transition: all .15s;
 }
 
-.ds-link:hover {
+.ds-link-btn:hover {
   background: var(--accent-bg);
   border-color: var(--accent);
 }
 
-/* ── Section title ───────────────────────────────────────────────────────── */
-.ds-subtitle {
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--text3);
-  margin: 12px 0 5px;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+/* ── Timeline Chart ──────────────────────────────────────────────────────── */
+.ds-timeline-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 8px 8px;
+  margin-bottom: 10px;
+}
+
+.ds-timeline-chart {
   display: flex;
-  align-items: center;
-  gap: 5px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px;
+  height: 90px;
 }
 
-.ds-subtitle::after {
-  content: '';
+.ds-timeline-item {
   flex: 1;
-  height: 1px;
-  background: var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  min-width: 0;
 }
 
-/* ── Transaction list ────────────────────────────────────────────────────── */
+.ds-timeline-value {
+  font-size: 8.5px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.ds-timeline-value.payment { color: var(--green); }
+.ds-timeline-value.sale { color: var(--blue); }
+
+.ds-timeline-bar-wrap {
+  width: 100%;
+  max-width: 16px;
+  height: 50px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.ds-timeline-bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease;
+}
+
+.ds-timeline-bar.payment {
+  background: linear-gradient(180deg, #10b981, #059669);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.3);
+}
+
+.ds-timeline-bar.sale {
+  background: linear-gradient(180deg, #38bdf8, #0284c7);
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.3);
+}
+
+.ds-timeline-date {
+  font-size: 8.5px;
+  color: var(--text3);
+  margin-top: 3px;
+  white-space: nowrap;
+}
+
+.ds-timeline-kind {
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 3px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.ds-timeline-item:has(.payment) .ds-timeline-kind {
+  color: var(--green);
+  background: var(--green-bg);
+}
+
+.ds-timeline-item:has(.sale) .ds-timeline-kind {
+  color: var(--blue);
+  background: var(--blue-bg);
+}
+
+/* ── Transactions & Items List ───────────────────────────────────────────── */
 .ds-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  margin-bottom: 10px;
 }
 
 .ds-list-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   padding: 7px 9px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  transition: border-color .15s;
+  border-radius: var(--r-xs);
+  transition: all 0.15s ease;
 }
 
 .ds-list-item:hover {
+  background: var(--surface2);
   border-color: var(--border2);
 }
 
 .ds-list-label {
-  font-weight: 600;
   font-size: 11px;
+  font-weight: 700;
   color: var(--text);
+  line-height: 1.2;
 }
 
 .ds-list-sub {
-  font-size: 9px;
+  font-size: 9.5px;
   color: var(--text3);
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .ds-list-amount {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
-  letter-spacing: -.01em;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ds-red { color: var(--red); }
+.ds-green { color: var(--green); }
+.ds-blue { color: var(--blue); }
+.ds-orange { color: var(--warn); }
+
+/* ── Workflow state banner ────────────────────────────────────────────────── */
+.ds-flow-state {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.ds-flow-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.ds-flow-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.ds-flow-time {
+  font-size: 9px;
+  color: var(--text3);
+}
+
+.ds-flow-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+}
+
+.ds-flow-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--text2);
+  padding: 2px 0;
+}
+
+/* ── Banners & Notices ───────────────────────────────────────────────────── */
+.ds-warn-banner {
+  background: var(--warn-bg);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--warn);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border-radius: var(--r-xs);
+  margin-bottom: 6px;
+}
+
+.ds-soft-banner {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 10.5px;
+  padding: 6px 8px;
+  border-radius: var(--r-xs);
+  margin-bottom: 6px;
+}
+
+.ds-notice-banner {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+  font-size: 10.5px;
+  padding: 6px 8px;
+  border-radius: var(--r-xs);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Pending Tasks in Customer View ──────────────────────────────────────── */
+.ds-pending-tasks-section {
+  margin-bottom: 10px;
+}
+
+.ds-pending-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ds-pending-task-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── Modal Dialog System ─────────────────────────────────────────────────── */
+.ds-modal-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  animation: fadeIn .2s ease;
+  overflow: hidden;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.ds-modal {
+  width: 100%;
+  max-height: calc(100% - 10px);
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ds-modal-header,
+.ds-modal-head {
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-shrink: 0;
 }
 
-/* ── Muted / empty ───────────────────────────────────────────────────────── */
-.ds-muted {
-  font-size: 11px;
-  color: var(--text3);
-  text-align: center;
-  padding: 6px 0;
+.ds-modal-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.ds-empty {
-  text-align: center;
-  padding: 32px 16px;
-  color: var(--text3);
-  font-size: 11px;
-  line-height: 1.6;
+.ds-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  padding: 0;
 }
 
-.ds-empty-icon {
-  font-size: 24px;
-  margin-bottom: 6px;
-  opacity: .35;
+.ds-modal-close:hover {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.ds-modal-body {
+  padding: 12px 14px;
+  overflow-y: auto;
+  flex: 1;
+  max-height: calc(100vh - 120px);
+}
+
+.ds-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 12px;
+  padding-bottom: 2px;
+}
+
+/* ── Forms, Inputs & Selects ─────────────────────────────────────────────── */
+.ds-field {
+  margin-bottom: 8px;
+}
+
+.ds-label {
   display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 3px;
 }
 
-/* ── Loading ─────────────────────────────────────────────────────────────── */
+.ds-input,
+.ds-select,
+.ds-textarea {
+  width: 100%;
+  padding: 7px 9px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-size: 11.5px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.ds-input:focus,
+.ds-select:focus,
+.ds-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  background: var(--bg);
+}
+
+.ds-textarea {
+  resize: vertical;
+  min-height: 48px;
+}
+
+.ds-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* ── Quick Fill Chips ────────────────────────────────────────────────────── */
+.ds-quick-fill-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.ds-chip-btn {
+  flex: 1;
+  padding: 4px 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  color: var(--text2);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s ease;
+  font-family: inherit;
+}
+
+.ds-chip-btn:hover {
+  background: var(--surface3);
+  color: var(--text);
+  border-color: var(--border2);
+}
+
+/* ── Template Cards ──────────────────────────────────────────────────────── */
+.ds-tpl-filter-bar {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+  scrollbar-width: none;
+}
+
+.ds-tpl-filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.ds-tpl-filter-btn {
+  padding: 3px 7px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text3);
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ds-tpl-filter-btn.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ds-tpl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ds-tpl-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px;
+  transition: all .15s ease;
+}
+
+.ds-tpl-card:hover {
+  border-color: var(--border2);
+  background: var(--surface2);
+}
+
+.ds-tpl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.ds-tpl-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.ds-tpl-shortcut {
+  font-size: 9px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+}
+
+.ds-tpl-preview {
+  font-size: 10.5px;
+  color: var(--text2);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 55px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 5px 7px;
+  border-radius: 5px;
+  margin-bottom: 6px;
+}
+
+.ds-tpl-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+/* ── Cart Table in Quick Sale ────────────────────────────────────────────── */
+.ds-cart-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.ds-cart-table th {
+  text-align: left;
+  padding: 4px 5px;
+  color: var(--text3);
+  border-bottom: 1px solid var(--border2);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.ds-cart-table td {
+  padding: 5px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.ds-cart-qty-input,
+.ds-cart-price-input {
+  padding: 3px 5px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ds-cart-qty-input { width: 36px; text-align: center; }
+.ds-cart-price-input { width: 58px; text-align: right; }
+
+.ds-cart-total-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  margin-bottom: 8px;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+/* ── Autocomplete Suggest Box ─────────────────────────────────────────────── */
+.ds-suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
+  max-height: 130px;
+  overflow-y: auto;
+  z-index: 300;
+  margin-top: 4px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.ds-suggest-item {
+  padding: 6px 9px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+}
+
+.ds-suggest-item:hover {
+  background: var(--surface2);
+  color: var(--accent);
+}
+
+/* ── Tools Grid ──────────────────────────────────────────────────────────── */
+.ds-tools-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.ds-subtitle {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 6px;
+}
+
+/* ── Toast Feedback Notification ─────────────────────────────────────────── */
+.ds-toast {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(17, 24, 39, 0.95);
+  border: 1px solid var(--accent);
+  color: #fff;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 15px var(--accent-glow);
+  z-index: 2000;
+  pointer-events: none;
+  animation: toastPop .25s cubic-bezier(.34, 1.56, .64, 1);
+  white-space: nowrap;
+}
+
+@keyframes toastPop {
+  from { opacity: 0; transform: translate(-50%, 10px) scale(0.9); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* ── Spinner & Loaders ───────────────────────────────────────────────────── */
 .ds-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 28px 0;
+  gap: 8px;
+  padding: 20px 0;
   color: var(--text3);
   font-size: 11px;
 }
@@ -558,274 +1355,22 @@
 .ds-spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid var(--border2);
+  border: 2px solid var(--surface3);
   border-top-color: var(--accent);
   border-radius: 50%;
-  animation: dsSpin .65s linear infinite;
-  flex-shrink: 0;
+  animation: dsSpin 0.7s linear infinite;
 }
 
 @keyframes dsSpin {
-  to {
-    transform: rotate(360deg)
-  }
+  to { transform: rotate(360deg); }
 }
 
-/* ── Modal (scoped inside panel) ─────────────────────────────────────────── */
-.ds-modal-wrap {
-  position: absolute;
-  inset: 0;
-  background: rgba(10, 12, 18, .82);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-  border-radius: var(--r);
-  animation: dsFade .15s ease;
-}
-
-@keyframes dsFade {
-  from {
-    opacity: 0
-  }
-
-  to {
-    opacity: 1
-  }
-}
-
-/* panel must be position:relative for absolute child to work */
-#ds-wa-panel {
-  position: fixed;
-}
-
-/* already fixed — also add relative stacking */
-
-.ds-modal {
-  width: 100%;
-  max-width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--border2);
-  border-radius: var(--r);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, .7);
-  overflow: hidden;
-  animation: dsModalIn .18s cubic-bezier(.34, 1.56, .64, 1);
-  max-height: calc(100% - 24px);
-  display: flex;
-  flex-direction: column;
-}
-
-@keyframes dsModalIn {
-  from {
-    opacity: 0;
-    transform: scale(.94) translateY(6px)
-  }
-
-  to {
-    opacity: 1;
-    transform: none
-  }
-}
-
-.ds-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 11px 13px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.ds-modal-title {
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.ds-modal-close {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 17px;
+.ds-muted {
   color: var(--text3);
-  line-height: 1;
-  padding: 3px 7px;
-  border-radius: 5px;
-  transition: all .15s;
-  font-family: inherit;
-}
-
-.ds-modal-close:hover {
-  background: rgba(255, 95, 112, .12);
-  color: var(--red);
-}
-
-.ds-modal-body {
-  padding: 13px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.ds-modal-actions {
-  display: flex;
-  gap: 7px;
-  margin-top: 12px;
-}
-
-/* ── Forms ───────────────────────────────────────────────────────────────── */
-.ds-field {
-  margin-bottom: 10px;
-}
-
-.ds-label {
-  display: block;
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--text3);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  margin-bottom: 5px;
-}
-
-.ds-input,
-.ds-select,
-.ds-textarea {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--bg);
-  border: 1px solid var(--border2);
-  border-radius: var(--r-sm);
-  padding: 7px 10px;
-  color: var(--text);
-  font-size: 12px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color .15s, box-shadow .15s;
-}
-
-.ds-input:focus,
-.ds-select:focus,
-.ds-textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 229, 160, .1);
-}
-
-.ds-input::placeholder,
-.ds-textarea::placeholder {
-  color: var(--text3);
-}
-
-.ds-textarea {
-  min-height: 64px;
-  resize: vertical;
-  line-height: 1.5;
-}
-
-.ds-select {
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%234e5468' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 9px center;
-  padding-right: 26px;
-}
-
-.ds-select option {
-  background: var(--surface2);
-}
-
-.ds-row {
-  display: flex;
-  gap: 7px;
-}
-
-.ds-row>.ds-field {
-  flex: 1;
-}
-
-.ds-checkbox-label {
   font-size: 11px;
-  color: var(--text2);
+  text-align: center;
 }
 
-/* ── Suggest ─────────────────────────────────────────────────────────────── */
-.ds-suggest {
-  margin-top: 5px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.ds-suggest-item {
-  width: 100%;
-  text-align: left;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: 8px 10px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 11px;
-  color: var(--text);
-  transition: all .12s;
-  outline: none;
-}
-
-.ds-suggest-item:hover {
-  border-color: var(--accent);
-  background: var(--accent-bg);
-}
-
-.ds-suggest-item .ds-muted {
-  text-align: left;
-  padding: 1px 0 0;
-  font-size: 10px;
-}
-
-/* ── Tools grid ──────────────────────────────────────────────────────────── */
-.ds-tools-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-/* ── Warn banner ─────────────────────────────────────────────────────────── */
-.ds-warn-banner {
-  background: rgba(255, 179, 71, .08);
-  border: 1px solid rgba(255, 179, 71, .18);
-  border-radius: var(--r-sm);
-  padding: 6px 9px;
-  font-size: 10px;
-  color: var(--warn);
-  margin-bottom: 8px;
-  line-height: 1.5;
-}
-
-/* ── Resize handle ───────────────────────────────────────────────────────── */
-.ds-resize-handle {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-  cursor: ew-resize;
-  z-index: 10;
-}
-
-.ds-resize-handle::after {
-  content: '';
-  position: absolute;
-  left: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1px;
-  height: 32px;
-  background: var(--border2);
-  border-radius: 1px;
-  transition: background .2s;
-}
-
-.ds-resize-handle:hover::after {
-  background: var(--accent);
+.ds-hidden {
+  display: none !important;
 }

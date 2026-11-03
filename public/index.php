@@ -4,9 +4,19 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'bootstrap.php';
 
+if (!headers_sent()) {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+}
+
 $page = (string)($_GET['page'] ?? '');
 if ($page === '') {
-    $page = auth_is_logged_in() ? 'dashboard' : 'login';
+    if (auth_is_logged_in()) {
+        $page = app_is_super_admin() ? 'admin_panel' : 'dashboard';
+    } else {
+        $page = 'login';
+    }
 }
 
 $CURRENT_PAGE = $page;
@@ -25,6 +35,7 @@ $allowed = [
     'dashboard' => 'dashboard.php',
     'customers' => 'customers.php',
     'products' => 'products.php',
+    'services' => 'services.php',
     'pricing' => 'pricing.php',
     'sales' => 'sales.php',
     'dues' => 'dues.php',
@@ -33,12 +44,14 @@ $allowed = [
     'expenses' => 'expenses.php',
     'reports' => 'reports.php',
     'settings' => 'settings.php',
+    'admin_panel' => 'admin_panel.php',
     'admin_tools' => 'admin_tools.php',
     'audit_logs' => 'audit_logs.php',
     'ajax_audit_logs' => 'ajax_audit_logs.php',
     'ajax_sales_list' => 'ajax_sales_list.php',
     'ajax_expenses_list' => 'ajax_expenses_list.php',
     'ajax_profile' => 'ajax_profile.php',
+    'ajax_extension_bootstrap' => 'ajax_extension_bootstrap.php',
     'ajax_price' => 'ajax_price.php',
     'ajax_reports' => 'ajax_reports.php',
     'ajax_customer_lookup' => 'ajax_customer_lookup.php',
@@ -54,6 +67,11 @@ $allowed = [
     'ajax_dues_list' => 'ajax_dues_list.php',
     'ajax_send_notification' => 'ajax_send_notification.php',
     'ajax_send_invoice' => 'ajax_send_invoice.php',
+    'ajax_task_add' => 'ajax_task_add.php',
+    'ajax_task_list' => 'ajax_task_list.php',
+    'ajax_task_deliver' => 'ajax_task_deliver.php',
+    'ajax_task_update' => 'ajax_task_update.php',
+    'ajax_quick_templates' => 'ajax_quick_templates.php',
 ];
 
 if (!isset($allowed[$page])) {

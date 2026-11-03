@@ -11,6 +11,9 @@ function app_send_mail(string $to, string $subject, string $html): bool
     $encryption = strtolower(smtp_setting_for_admin(0, 'smtp_encryption', 'tls'));
     $fromName = app_setting('company_name', 'Admin');
 
+    // Gmail displays app passwords with spaces; SMTP AUTH expects the compact value.
+    $pass = preg_replace('/\s+/', '', $pass) ?? $pass;
+
     if ($user === '' || $pass === '') {
         return false;
     }
@@ -26,6 +29,8 @@ function app_send_mail_for_admin(int $adminId, string $to, string $subject, stri
     $pass = smtp_setting_for_admin(0, 'smtp_pass', '');
     $encryption = strtolower(smtp_setting_for_admin(0, 'smtp_encryption', 'tls'));
     $fromName = smtp_setting_for_admin($adminId, 'company_name', 'Admin');
+
+    $pass = preg_replace('/\s+/', '', $pass) ?? $pass;
 
     if ($user === '' || $pass === '') {
         return false;

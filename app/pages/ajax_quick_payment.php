@@ -35,7 +35,10 @@ if ($customerId <= 0 || $amount <= 0) {
     exit;
 }
 
+$paymentTransactionOpen = false;
 try {
+    $pdo->exec('BEGIN IMMEDIATE');
+    $paymentTransactionOpen = true;
     $stmt = $pdo->prepare('
         SELECT id, total_sell, paid_amount 
         FROM sales 
@@ -48,7 +51,6 @@ try {
     $remaining = $amount;
     $payments = [];
 
-    $pdo->beginTransaction();
     foreach ($unpaid as $sale) {
         if ($remaining <= 0) break;
         $saleId = (int)$sale['id'];
@@ -70,11 +72,12 @@ try {
             $remaining -= $payAmt;
         }
     }
-    $pdo->commit();
+    $pdo->exec('COMMIT');
+    $paymentTransactionOpen = false;
 
     app_audit_log('create', 'payment_batch', $customerId, ['amount' => $amount, 'remaining' => $remaining]);
     echo json_encode(['ok' => true, 'distributed' => $payments, 'remaining' => $remaining]);
 } catch (Throwable $e) {
-    $pdo->rollBack();
+    if ($paymentTransactionOpen) $pdo->exec('ROLLBACK');
     echo json_encode(['ok' => false, 'error' => 'Payment failed']);
 }

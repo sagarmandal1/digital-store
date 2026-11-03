@@ -42,10 +42,45 @@ if ($isSuperAdmin) {
     }
 }
 
+$globalNotice = '';
+if ($isLoggedIn) {
+    $globalNotice = trim((string)app_setting('global_notice', ''));
+}
+
 function nav_active(string $key, string $currentPage): string
 {
     return $key === $currentPage ? 'active' : '';
 }
+
+function page_label(string $page): string
+{
+    $map = [
+        'dashboard' => 'Overview',
+        'customers' => 'Customers',
+        'products' => 'Products',
+        'services' => 'Services & Workflow',
+        'pricing' => 'Custom Pricing',
+        'sales' => 'Sales',
+        'dues' => 'Collections',
+        'expenses' => 'Expenses',
+        'reports' => 'Reports',
+        'settings' => 'Settings',
+        'admin_panel' => 'Admin Panel',
+        'profile' => 'Profile',
+        'users' => 'User Management',
+        'admin_tools' => 'Admin Tools',
+        'audit_logs' => 'Audit Logs',
+        'login' => 'Login',
+        'register' => 'Register',
+        'forgot' => 'Forgot Password',
+        'reset_password' => 'Reset Password',
+        'otp' => 'OTP Verification',
+    ];
+    return $map[$page] ?? ucfirst(str_replace('_', ' ', $page));
+}
+
+$pageLabel = page_label($currentPage !== '' ? $currentPage : 'dashboard');
+$fullTitle = $pageLabel . ' | ' . $appName;
 
 ?>
 <!doctype html>
@@ -53,9 +88,14 @@ function nav_active(string $key, string $currentPage): string
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= e($appName) ?></title>
+    <title><?= e($fullTitle) ?></title>
+    <meta name="description" content="<?= e($appName) ?> management panel for sales, customers, invoices and analytics.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="assets/app.css?v=20260315.3" rel="stylesheet">
     <script>
         (function () {
             const saved = localStorage.getItem('theme');
@@ -63,18 +103,8 @@ function nav_active(string $key, string $currentPage): string
             document.documentElement.setAttribute('data-bs-theme', theme);
         })();
     </script>
-    <style>
-        .app-shell { min-height: 100vh; display: flex; }
-        .app-sidebar { width: 280px; border-right: 1px solid rgba(0,0,0,.1); }
-        [data-bs-theme="dark"] .app-sidebar { border-right-color: rgba(255,255,255,.12); }
-        .app-content { min-width: 0; }
-        .nav-pill-icon { width: 1.25rem; }
-        .toast-container { z-index: 1080; }
-        .table-responsive { overflow-y: visible; }
-        .dropdown-menu { z-index: 2000; }
-    </style>
 </head>
-<body class="bg-body">
+<body class="app-body bg-body">
 <?php if ($isLoggedIn): ?>
     <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
         <div class="offcanvas-header">
@@ -85,9 +115,13 @@ function nav_active(string $key, string $currentPage): string
             <div class="p-3">
                 <div class="text-muted small mb-2">Menu</div>
                 <div class="nav nav-pills flex-column gap-1">
+                    <?php if ($isSuperAdmin): ?>
+                        <a class="nav-link <?= e(nav_active('admin_panel', $currentPage)) ?>" href="index.php?page=admin_panel"><i class="bi bi-shield-lock me-2 nav-pill-icon"></i>Admin Panel</a>
+                    <?php endif; ?>
                     <a class="nav-link <?= e(nav_active('dashboard', $currentPage)) ?>" href="index.php?page=dashboard"><i class="bi bi-speedometer2 me-2 nav-pill-icon"></i>Dashboard</a>
                     <a class="nav-link <?= e(nav_active('customers', $currentPage)) ?>" href="index.php?page=customers"><i class="bi bi-people me-2 nav-pill-icon"></i>Customers</a>
                     <a class="nav-link <?= e(nav_active('products', $currentPage)) ?>" href="index.php?page=products"><i class="bi bi-box-seam me-2 nav-pill-icon"></i>Products</a>
+                    <a class="nav-link <?= e(nav_active('services', $currentPage)) ?>" href="index.php?page=services"><i class="bi bi-clipboard2-check me-2 nav-pill-icon"></i>Services & Workflow</a>
                     <a class="nav-link <?= e(nav_active('pricing', $currentPage)) ?>" href="index.php?page=pricing"><i class="bi bi-tag me-2 nav-pill-icon"></i>Custom Pricing</a>
                     <a class="nav-link <?= e(nav_active('sales', $currentPage)) ?>" href="index.php?page=sales"><i class="bi bi-receipt me-2 nav-pill-icon"></i>Sales</a>
                     <a class="nav-link <?= e(nav_active('dues', $currentPage)) ?>" href="index.php?page=dues"><i class="bi bi-cash-coin me-2 nav-pill-icon"></i>Due</a>
@@ -108,14 +142,18 @@ function nav_active(string $key, string $currentPage): string
     <div class="app-shell">
         <aside class="app-sidebar d-none d-lg-flex flex-column p-3 bg-body-tertiary">
             <div class="d-flex align-items-center justify-content-between mb-3">
-                <a class="text-decoration-none fw-semibold" href="index.php?page=dashboard"><?= e($appName) ?></a>
+                <a class="text-decoration-none fw-semibold app-brand" href="index.php?page=dashboard"><?= e($appName) ?></a>
                 <button class="btn btn-sm btn-outline-secondary" type="button" id="themeToggleSidebar"><i class="bi bi-moon-stars"></i></button>
             </div>
             <div class="text-muted small mb-2">Menu</div>
             <div class="nav nav-pills flex-column gap-1">
+                <?php if ($isSuperAdmin): ?>
+                    <a class="nav-link <?= e(nav_active('admin_panel', $currentPage)) ?>" href="index.php?page=admin_panel"><i class="bi bi-shield-lock me-2 nav-pill-icon"></i>Admin Panel</a>
+                <?php endif; ?>
                 <a class="nav-link <?= e(nav_active('dashboard', $currentPage)) ?>" href="index.php?page=dashboard"><i class="bi bi-speedometer2 me-2 nav-pill-icon"></i>Dashboard</a>
                 <a class="nav-link <?= e(nav_active('customers', $currentPage)) ?>" href="index.php?page=customers"><i class="bi bi-people me-2 nav-pill-icon"></i>Customers</a>
                 <a class="nav-link <?= e(nav_active('products', $currentPage)) ?>" href="index.php?page=products"><i class="bi bi-box-seam me-2 nav-pill-icon"></i>Products</a>
+                <a class="nav-link <?= e(nav_active('services', $currentPage)) ?>" href="index.php?page=services"><i class="bi bi-clipboard2-check me-2 nav-pill-icon"></i>Services & Workflow</a>
                 <a class="nav-link <?= e(nav_active('pricing', $currentPage)) ?>" href="index.php?page=pricing"><i class="bi bi-tag me-2 nav-pill-icon"></i>Custom Pricing</a>
                 <a class="nav-link <?= e(nav_active('sales', $currentPage)) ?>" href="index.php?page=sales"><i class="bi bi-receipt me-2 nav-pill-icon"></i>Sales</a>
                 <a class="nav-link <?= e(nav_active('dues', $currentPage)) ?>" href="index.php?page=dues"><i class="bi bi-cash-coin me-2 nav-pill-icon"></i>Due</a>
@@ -138,13 +176,13 @@ function nav_active(string $key, string $currentPage): string
         </aside>
 
         <div class="app-content flex-grow-1">
-            <nav class="navbar navbar-expand bg-body-tertiary border-bottom sticky-top">
+            <nav class="navbar navbar-expand bg-body-tertiary border-bottom sticky-top app-topbar">
                 <div class="container-fluid">
                     <button class="btn btn-outline-secondary d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas">
                         <i class="bi bi-list"></i>
                     </button>
                     <div class="d-flex align-items-center ms-2">
-                        <span class="fw-semibold"><?= e(ucfirst($currentPage !== '' ? $currentPage : 'dashboard')) ?></span>
+                        <span class="fw-semibold"><?= e($pageLabel) ?></span>
                         <?php if ($isSuperAdmin): ?>
                             <span class="badge ms-2 <?= $scopeAdminId === 0 ? 'text-bg-warning' : 'text-bg-secondary' ?>">
                                 Viewing: <?= e($scopeLabel) ?>
@@ -174,6 +212,7 @@ function nav_active(string $key, string $currentPage): string
                                         </li>
                                     <?php endforeach; ?>
                                     <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="index.php?page=admin_panel"><i class="bi bi-shield-lock me-2"></i>Admin Panel</a></li>
                                     <li><a class="dropdown-item" href="index.php?page=users"><i class="bi bi-people-fill me-2"></i>User Management</a></li>
                                     <li><a class="dropdown-item" href="index.php?page=admin_tools"><i class="bi bi-tools me-2"></i>Admin Tools</a></li>
                                     <li><a class="dropdown-item" href="index.php?page=audit_logs"><i class="bi bi-clipboard-data me-2"></i>Audit Logs</a></li>
@@ -188,10 +227,10 @@ function nav_active(string $key, string $currentPage): string
                 </div>
             </nav>
 
-            <main class="container-fluid py-4">
+            <main class="container-fluid py-4 app-main-content">
                 <div class="container-xxl">
 <?php else: ?>
-    <main class="container py-5">
+    <main class="container py-5 app-auth-shell">
 <?php endif; ?>
         <?php if ($isSuperAdmin && $scopeAdminId === 0): ?>
             <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -217,6 +256,12 @@ function nav_active(string $key, string $currentPage): string
         <?php if (!app_db_initialized()): ?>
             <div class="alert alert-warning">
                 Database not initialized. Run: <code>php scripts/init_db.php</code>
+            </div>
+        <?php endif; ?>
+        <?php if ($isLoggedIn && $globalNotice !== ''): ?>
+            <div class="alert alert-info d-flex align-items-center gap-2" role="alert">
+                <i class="bi bi-megaphone"></i>
+                <div class="small fw-semibold"><?= e($globalNotice) ?></div>
             </div>
         <?php endif; ?>
 

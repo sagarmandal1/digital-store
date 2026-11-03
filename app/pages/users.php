@@ -324,11 +324,113 @@ $stmt = $pdo->prepare("
 $stmt->execute();
 $users = $stmt->fetchAll();
 
+$search = trim((string)($_GET['q'] ?? ''));
+$statusFilter = strtolower(trim((string)($_GET['status'] ?? 'all')));
+if (!in_array($statusFilter, ['all', 'active', 'disabled'], true)) {
+    $statusFilter = 'all';
+}
+
+$summary = [
+    'total_users' => 0,
+    'active_users' => 0,
+    'disabled_users' => 0,
+    'customers' => 0,
+    'products' => 0,
+    'sales' => 0,
+    'payments' => 0,
+    'expenses' => 0,
+];
+
+$filteredUsers = [];
+foreach ($users as $u) {
+    $isActive = (int)($u['active'] ?? 1) === 1;
+    $summary['total_users']++;
+    $summary[$isActive ? 'active_users' : 'disabled_users']++;
+    $summary['customers'] += (int)($u['customers_count'] ?? 0);
+    $summary['products'] += (int)($u['products_count'] ?? 0);
+    $summary['sales'] += (int)($u['sales_count'] ?? 0);
+    $summary['payments'] += (int)($u['payments_count'] ?? 0);
+    $summary['expenses'] += (int)($u['expenses_count'] ?? 0);
+
+    $name = strtolower((string)($u['name'] ?? ''));
+    $email = strtolower((string)($u['email'] ?? ''));
+    $matchesSearch = $search === '' || str_contains($name, strtolower($search)) || str_contains($email, strtolower($search));
+    $matchesStatus = $statusFilter === 'all' || ($statusFilter === 'active' && $isActive) || ($statusFilter === 'disabled' && !$isActive);
+    if ($matchesSearch && $matchesStatus) {
+        $filteredUsers[] = $u;
+    }
+}
+
 require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'partials' . DIRECTORY_SEPARATOR . 'header.php';
 ?>
 
 <div class="d-flex align-items-center justify-content-between mb-3">
     <h1 class="h3 mb-0">Users</h1>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="index.php?page=admin_tools">Admin Tools</a>
+        <a class="btn btn-outline-secondary" href="index.php?page=audit_logs">Audit Logs</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-1">
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="small opacity-75">Total Users</div>
+                <div class="h4 mb-0 fw-bold"><?= (int)$summary['total_users'] ?></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 bg-success text-white h-100">
+            <div class="card-body">
+                <div class="small opacity-75">Active Users</div>
+                <div class="h4 mb-0 fw-bold"><?= (int)$summary['active_users'] ?></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 bg-danger text-white h-100">
+            <div class="card-body">
+                <div class="small opacity-75">Disabled Users</div>
+                <div class="h4 mb-0 fw-bold"><?= (int)$summary['disabled_users'] ?></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 bg-warning text-dark h-100">
+            <div class="card-body">
+                <div class="small opacity-75">Total Sales Records</div>
+                <div class="h4 mb-0 fw-bold"><?= (int)$summary['sales'] ?></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" action="index.php" class="row g-2 align-items-end">
+            <input type="hidden" name="page" value="users">
+            <div class="col-12 col-lg-5">
+                <label class="form-label">Search User</label>
+                <input class="form-control" name="q" value="<?= e($search) ?>" placeholder="Search by name or email">
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" name="status">
+                    <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>All</option>
+                    <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Active</option>
+                    <option value="disabled" <?= $statusFilter === 'disabled' ? 'selected' : '' ?>>Disabled</option>
+                </select>
+            </div>
+            <div class="col-12 col-lg-auto">
+                <button class="btn btn-primary" type="submit">Apply Filter</button>
+            </div>
+            <div class="col-12 col-lg-auto">
+                <a class="btn btn-outline-secondary" href="index.php?page=users">Reset</a>
+            </div>
+        </form>
+    </div>
 </div>
 
 <div class="row g-3">
@@ -375,10 +477,10 @@ require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR .
                         </tr>
                         </thead>
                         <tbody>
-                        <?php if (!$users): ?>
+                        <?php if (!$filteredUsers): ?>
                             <tr><td colspan="7" class="text-muted">No users.</td></tr>
                         <?php else: ?>
-                            <?php foreach ($users as $u): ?>
+                            <?php foreach ($filteredUsers as $u): ?>
                                 <?php $uid = (int)($u['id'] ?? 0); ?>
                                 <?php $isActive = (int)($u['active'] ?? 1) === 1; ?>
                                 <tr>

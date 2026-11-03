@@ -8,7 +8,9 @@ date_default_timezone_set((string)$APP_CONFIG['timezone']);
 
 session_name((string)$APP_CONFIG['session_name']);
 session_start([
+    'use_strict_mode' => true,
     'cookie_httponly' => true,
+    'cookie_secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
     'cookie_samesite' => 'Lax',
 ]);
 
@@ -225,6 +227,15 @@ function app_ext_api_scope_admin_id(int $tokenAdminId): int
 
 function app_ext_api_require_token_admin_id(): int
 {
+    $rl = app_rate_limit_allow(app_rate_limit_key('ext_api_auth'), 60, 300);
+    if (!($rl['ok'] ?? true)) {
+        app_ext_api_send_json(429, [
+            'ok' => false,
+            'error' => 'Too many API auth attempts',
+            'retry_after' => (int)($rl['retry_after'] ?? 0),
+        ]);
+    }
+
     $adminId = app_ext_api_token_admin_id();
     if ($adminId <= 0) {
         app_ext_api_send_json(401, ['ok' => false, 'error' => 'Unauthorized']);
@@ -248,6 +259,73 @@ function app_ext_api_ensure_customer_notes_table(): void
         )');
         db()->exec('CREATE INDEX IF NOT EXISTS idx_customer_notes_customer ON customer_notes(customer_id)');
         db()->exec('CREATE INDEX IF NOT EXISTS idx_customer_notes_admin ON customer_notes(admin_id)');
+    } catch (Throwable $e) {
+        return;
+    }
+}
+
+function app_ensure_customer_tasks_table(): void
+{
+    if (!app_db_initialized()) {
+        return;
+    }
+    try {
+        db()->exec('CREATE TABLE IF NOT EXISTS customer_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER NOT NULL,
+            admin_id INTEGER NOT NULL DEFAULT 0,
+            task_name TEXT NOT NULL,
+            notes TEXT DEFAULT \'\',
+            amount REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT \'pending\',
+            sale_id INTEGER DEFAULT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime(\'now\')),
+            delivered_at TEXT DEFAULT NULL,
+            FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+        )');
+        db()->exec('CREATE INDEX IF NOT EXISTS idx_customer_tasks_customer ON customer_tasks(customer_id)');
+        db()->exec('CREATE INDEX IF NOT EXISTS idx_customer_tasks_admin ON customer_tasks(admin_id)');
+        db()->exec('CREATE INDEX IF NOT EXISTS idx_customer_tasks_status ON customer_tasks(status)');
+    } catch (Throwable $e) {
+        return;
+    }
+}
+
+/**
+ * Configurable service catalogue for document-service businesses.
+ * These tables intentionally do not alter legacy sales or task records.
+ */
+function app_ensure_service_catalog_tables(): void
+{
+    if (!app_db_initialized()) {
+        return;
+    }
+
+    try {
+        $pdo = db();
+        $pdo->exec('CREATE TABLE IF NOT EXISTS service_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_id INTEGER NOT NULL DEFAULT 0,
+            name TEXT NOT NULL,
+            default_price REAL NOT NULL DEFAULT 0,
+            document_checklist TEXT NOT NULL DEFAULT \'\',
+            estimated_days INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
+        )');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_service_types_admin ON service_types(admin_id)');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS workflow_statuses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_id INTEGER NOT NULL DEFAULT 0,
+            name TEXT NOT NULL,
+            color TEXT NOT NULL DEFAULT \'secondary\',
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_final INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime(\'now\')),
+            UNIQUE(admin_id, name)
+        )');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_workflow_statuses_admin_sort ON workflow_statuses(admin_id, sort_order)');
     } catch (Throwable $e) {
         return;
     }
@@ -305,6 +383,7 @@ function app_migrate_multi_user_schema(): void
 }
 
 app_migrate_multi_user_schema();
+app_ensure_service_catalog_tables();
 
 function app_migrate_admin_roles(): void
 {

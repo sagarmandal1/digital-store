@@ -48,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $waApiKey = trim((string)($_POST['whatsapp_api_key'] ?? ''));
     $waSslVerify = (string)($_POST['whatsapp_ssl_verify'] ?? '1') !== '0';
     $waCaBundlePath = trim((string)($_POST['whatsapp_ca_bundle_path'] ?? ''));
+    $paymentInfo = trim((string)($_POST['payment_info'] ?? ''));
 
     $smtpHost = '';
     $smtpPort = 587;
@@ -96,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([':key' => 'whatsapp_api_key', ':value' => $waApiKey, ':aid' => $adminId]);
         $stmt->execute([':key' => 'whatsapp_ssl_verify', ':value' => $waSslVerify ? '1' : '0', ':aid' => $adminId]);
         $stmt->execute([':key' => 'whatsapp_ca_bundle_path', ':value' => $waCaBundlePath, ':aid' => $adminId]);
+        $stmt->execute([':key' => 'payment_info', ':value' => $paymentInfo, ':aid' => $adminId]);
 
         if ($isSuperAdmin) {
             $pdo->prepare("DELETE FROM settings WHERE admin_id <> 0 AND key IN ('smtp_host','smtp_port','smtp_user','smtp_pass','smtp_encryption')")->execute();
@@ -125,6 +127,7 @@ $waBaseUrl = app_setting('whatsapp_base_url', 'https://wafastapi.com');
 $waApiKey = app_setting('whatsapp_api_key', '');
 $waSslVerify = app_setting('whatsapp_ssl_verify', '1') !== '0';
 $waCaBundlePath = app_setting('whatsapp_ca_bundle_path', '');
+$paymentInfo = app_setting('payment_info', '');
 $extTokenLast4 = app_setting('ext_api_token_last4', '');
 $extTokenPlain = (string)($_SESSION['ext_api_token_plain'] ?? '');
 unset($_SESSION['ext_api_token_plain']);
@@ -205,7 +208,13 @@ require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR .
                         </div>
                     </div>
                 </div>
-                
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Payment Info <span class="badge bg-secondary fw-normal ms-1" style="font-size:11px;">Extension</span></label>
+                    <textarea class="form-control font-monospace" name="payment_info" rows="7" placeholder="পেমেন্ট তথ্য লিখুন যা WhatsApp-এ পাঠানো হবে..."><?= htmlspecialchars($paymentInfo, ENT_QUOTES, 'UTF-8') ?></textarea>
+                    <div class="form-text">এই টেক্সটটি Extension থেকে বকেয়া রিমাইন্ডার ও ইনভয়েস পাঠানোর সময় অপশনালি যোগ করা যাবে। bKash মার্চেন্ট লিংক, ফোন নম্বর ইত্যাদি দিন।</div>
+                </div>
+
                 <div class="col-12">
                     <hr>
                     <div class="fw-semibold mb-2">SMTP Settings (for OTP & Email)</div>

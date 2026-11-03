@@ -30,6 +30,12 @@ if ($customerId <= 0 || $note === '') {
     app_ext_api_send_json(400, ['ok' => false, 'error' => 'customer_id and note required']);
 }
 
+$stmt = db()->prepare('SELECT 1 FROM customers WHERE id = :id AND admin_id = :aid LIMIT 1');
+$stmt->execute([':id' => $customerId, ':aid' => $aid]);
+if (!$stmt->fetchColumn()) {
+    app_ext_api_send_json(404, ['ok' => false, 'error' => 'Customer not found']);
+}
+
 try {
     $stmt = db()->prepare('INSERT INTO customer_notes (customer_id, note, admin_id) VALUES (:cid, :note, :aid)');
     $stmt->execute([':cid' => $customerId, ':note' => $note, ':aid' => $aid]);

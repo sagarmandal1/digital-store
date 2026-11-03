@@ -24,7 +24,7 @@ try {
         GROUP BY c.id
         HAVING due > 0.01
         ORDER BY due DESC
-        LIMIT 20
+        LIMIT 200
     ");
     $stmt->execute([':aid' => $aid]);
     $rows = $stmt->fetchAll() ?: [];

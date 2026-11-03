@@ -137,6 +137,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'test_whatsapp') {
 
 $pdo = db();
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'update_global_notice') {
+    $notice = trim((string)($_POST['global_notice'] ?? ''));
+    try {
+        $stmt = $pdo->prepare("INSERT INTO settings (key, value, admin_id) VALUES (:key, :value, 0)
+            ON CONFLICT(key, admin_id) DO UPDATE SET value=excluded.value");
+        $stmt->execute([':key' => 'global_notice', ':value' => $notice]);
+        app_audit_log('update', 'global_notice', 0, ['enabled' => $notice !== '']);
+        flash_set('success', 'Global notice updated.');
+    } catch (Throwable $e) {
+        flash_set('danger', 'Failed to update global notice.');
+    }
+    header('Location: index.php?page=admin_tools');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'update_registration') {
     $enabled = isset($_POST['public_registration_enabled']) ? '1' : '0';
     $code = trim((string)($_POST['public_registration_code'] ?? ''));
@@ -156,6 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'update_registration') 
 
 $registrationEnabled = true;
 $registrationCode = '';
+$globalNotice = '';
 try {
     $stmt = $pdo->prepare('SELECT value FROM settings WHERE key = :key AND admin_id = 0 LIMIT 1');
     $stmt->execute([':key' => 'public_registration_enabled']);
@@ -164,18 +180,97 @@ try {
     $stmt->execute([':key' => 'public_registration_code']);
     $c = $stmt->fetchColumn();
     $registrationCode = $c === false ? '' : (string)$c;
+    $stmt->execute([':key' => 'global_notice']);
+    $n = $stmt->fetchColumn();
+    $globalNotice = $n === false ? '' : (string)$n;
 } catch (Throwable $e) {
     $registrationEnabled = true;
     $registrationCode = '';
+    $globalNotice = '';
 }
 
 $adminEmail = (string)($_SESSION['admin_email'] ?? '');
+
+$dbPath = app_db_path();
+$dbSize = is_file($dbPath) ? (int)filesize($dbPath) : 0;
+
+$health = [
+    'smtp_ready' => false,
+    'wa_ready' => false,
+    'registration_enabled' => $registrationEnabled,
+    'db_size_label' => $dbSize > 0 ? number_format($dbSize / 1024 / 1024, 2) . ' MB' : 'N/A',
+    'total_users' => 0,
+    'active_users' => 0,
+];
+
+try {
+    $stmt = $pdo->prepare('SELECT value FROM settings WHERE key = :key AND admin_id = 0 LIMIT 1');
+    $stmt->execute([':key' => 'smtp_host']);
+    $smtpHost = trim((string)($stmt->fetchColumn() ?: ''));
+    $stmt->execute([':key' => 'smtp_user']);
+    $smtpUser = trim((string)($stmt->fetchColumn() ?: ''));
+    $stmt->execute([':key' => 'smtp_pass']);
+    $smtpPass = trim((string)($stmt->fetchColumn() ?: ''));
+    $health['smtp_ready'] = $smtpHost !== '' && $smtpUser !== '' && $smtpPass !== '';
+
+    $stmt->execute([':key' => 'whatsapp_base_url']);
+    $waBase = trim((string)($stmt->fetchColumn() ?: ''));
+    $stmt->execute([':key' => 'whatsapp_api_key']);
+    $waKey = trim((string)($stmt->fetchColumn() ?: ''));
+    $health['wa_ready'] = $waBase !== '' && $waKey !== '';
+
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM admins WHERE role='user'");
+    $stmt->execute();
+    $health['total_users'] = (int)$stmt->fetchColumn();
+
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM admins WHERE role='user' AND COALESCE(active,1)=1");
+    $stmt->execute();
+    $health['active_users'] = (int)$stmt->fetchColumn();
+} catch (Throwable $e) {
+}
 
 require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'partials' . DIRECTORY_SEPARATOR . 'header.php';
 ?>
 
 <div class="d-flex align-items-center justify-content-between mb-3">
     <h1 class="h3 mb-0">Admin Tools</h1>
+</div>
+
+<div class="row g-3 mb-1">
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="small opacity-75">Platform Users</div>
+                <div class="h4 mb-0 fw-bold"><?= (int)$health['total_users'] ?></div>
+                <div class="small opacity-75 mt-1">Active: <?= (int)$health['active_users'] ?></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm <?= $health['smtp_ready'] ? 'bg-success text-white' : 'bg-danger text-white' ?> h-100">
+            <div class="card-body">
+                <div class="small opacity-75">SMTP Health</div>
+                <div class="h5 mb-0 fw-bold"><?= $health['smtp_ready'] ? 'Configured' : 'Needs Setup' ?></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm <?= $health['wa_ready'] ? 'bg-success text-white' : 'bg-warning text-dark' ?> h-100">
+            <div class="card-body">
+                <div class="small opacity-75">WhatsApp API</div>
+                <div class="h5 mb-0 fw-bold"><?= $health['wa_ready'] ? 'Configured' : 'Needs Setup' ?></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm bg-dark text-white h-100">
+            <div class="card-body">
+                <div class="small opacity-75">Database Size</div>
+                <div class="h5 mb-0 fw-bold"><?= e((string)$health['db_size_label']) ?></div>
+                <div class="small opacity-75 mt-1"><?= $health['registration_enabled'] ? 'Registration Enabled' : 'Registration Disabled' ?></div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="row g-3">
@@ -242,6 +337,24 @@ require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR .
                     </div>
                     <div class="col-12">
                         <button class="btn btn-outline-success" type="submit">Send Test Message</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="fw-semibold mb-2">Global Notice Banner</div>
+                <form method="post" action="index.php?page=admin_tools" class="row g-2">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="update_global_notice">
+                    <div class="col-12 col-lg-9">
+                        <input class="form-control" name="global_notice" value="<?= e($globalNotice) ?>" placeholder="Example: Scheduled maintenance tonight 11:30 PM">
+                        <div class="form-text">Shown at top of all logged-in pages. Leave empty to disable.</div>
+                    </div>
+                    <div class="col-12 col-lg-auto">
+                        <button class="btn btn-outline-primary" type="submit">Save Notice</button>
                     </div>
                 </form>
             </div>
