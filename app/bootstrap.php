@@ -291,6 +291,118 @@ function app_ensure_customer_tasks_table(): void
     }
 }
 
+function app_ensure_customer_office_rates_table(): void
+{
+    if (!app_db_initialized()) {
+        return;
+    }
+    try {
+        db()->exec('CREATE TABLE IF NOT EXISTS customer_office_rates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER NOT NULL,
+            admin_id INTEGER NOT NULL DEFAULT 0,
+            office_name TEXT NOT NULL,
+            rate REAL NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (datetime(\'now\')),
+            UNIQUE(customer_id, office_name, admin_id),
+            FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+        )');
+        db()->exec('CREATE INDEX IF NOT EXISTS idx_cust_office_rates ON customer_office_rates(customer_id, office_name, admin_id)');
+    } catch (Throwable $e) {
+        return;
+    }
+}
+
+function app_extract_office_info(string $address): array
+{
+    $address = trim($address);
+    if ($address === '') {
+        return ['name' => 'Default', 'city_corp' => '', 'zone' => '', 'area' => ''];
+    }
+
+    $cityCorps = [
+        'ঢাকা উত্তর সিটি কর্পোরেশন',
+        'ঢাকা দক্ষিণ সিটি কর্পোরেশন',
+        'চট্টগ্রাম সিটি কর্পোরেশন',
+        'গাজীপুর সিটি কর্পোরেশন',
+        'নারায়ণগঞ্জ সিটি কর্পোরেশন',
+        'রাজশাহী সিটি কর্পোরেশন',
+        'খুলনা সিটি কর্পোরেশন',
+        'বরিশাল সিটি কর্পোরেশন',
+        'সিলেট সিটি কর্পোরেশন',
+        'রংপুর সিটি কর্পোরেশন',
+        'কুমিল্লা সিটি কর্পোরেশন',
+        'ময়মনসিংহ সিটি কর্পোরেশন',
+    ];
+
+    $matchedCc = '';
+    foreach ($cityCorps as $cc) {
+        if (str_contains($address, $cc)) {
+            $matchedCc = $cc;
+            break;
+        }
+    }
+    if ($matchedCc === '') {
+        if (str_contains($address, 'ঢাকা উত্তর')) {
+            $matchedCc = 'ঢাকা উত্তর সিটি কর্পোরেশন';
+        } elseif (str_contains($address, 'ঢাকা দক্ষিণ')) {
+            $matchedCc = 'ঢাকা দক্ষিণ সিটি কর্পোরেশন';
+        }
+    }
+
+    $zone = '';
+    if (preg_match('/(অঞ্চল\s*[-–:]?\s*[০-৯0-9]+)/u', $address, $zm)) {
+        $zone = preg_replace('/\s+/', '', $zm[1]);
+    }
+
+    $area = '';
+    $areaKeywords = ['বাসাবো', 'বাড্ডা', 'আফতাব নগর', 'সবুজবাগ', 'মিরপুর', 'উত্তরা', 'মোহাম্মদপুর', 'গুলশান', 'ধানমন্ডি', 'যাত্রাবাড়ী', 'মতিঝিল', 'খিলগাঁও', 'রামপুরা', 'বনশ্রী'];
+    foreach ($areaKeywords as $ak) {
+        if (str_contains($address, $ak)) {
+            $area = $ak;
+            break;
+        }
+    }
+
+    if ($matchedCc !== '') {
+        $sub = [];
+        if ($zone !== '') {
+            $sub[] = $zone;
+        }
+        if ($area !== '') {
+            $sub[] = $area;
+        }
+        $fullName = $matchedCc . ($sub ? ' (' . implode(', ', $sub) . ')' : '');
+        return [
+            'name' => $fullName,
+            'city_corp' => $matchedCc,
+            'zone' => $zone,
+            'area' => $area,
+        ];
+    }
+
+    $districts = ['বান্দরবান', 'কক্সবাজার', 'চট্টগ্রাম', 'সিলেট', 'ব্রাহ্মণবাড়িয়া', 'নোয়াখালী', 'কুমিল্লা', 'ময়মনসিংহ', 'রংপুর', 'রাজশাহী', 'খুলনা', 'বরিশাল'];
+    foreach ($districts as $d) {
+        if (str_contains($address, $d)) {
+            return [
+                'name' => $d,
+                'city_corp' => '',
+                'zone' => '',
+                'area' => $d,
+            ];
+        }
+    }
+
+    if (str_contains($address, 'পৌরসভা')) {
+        return ['name' => 'পৌরসভা', 'city_corp' => '', 'zone' => '', 'area' => ''];
+    }
+    if (str_contains($address, 'ইউনিয়ন')) {
+        return ['name' => 'ইউনিয়ন পরিষদ', 'city_corp' => '', 'zone' => '', 'area' => ''];
+    }
+
+    return ['name' => substr($address, 0, 40), 'city_corp' => '', 'zone' => '', 'area' => ''];
+}
+
 /**
  * Configurable service catalogue for document-service businesses.
  * These tables intentionally do not alter legacy sales or task records.

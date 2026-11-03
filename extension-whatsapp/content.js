@@ -1945,7 +1945,18 @@
         <input class="ds-input" id="ta-name" placeholder="যেমন: New Birth - DR. MD. NAJEEBUR RAHMAN (265979535)"></div>
       <div class="ds-field"><label class="ds-label">মূল্য / রেট (৳)</label>
         <input class="ds-input" id="ta-amt" inputmode="decimal" placeholder="0">
-        <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:5px;cursor:pointer;">
+        <div id="ta-rate-hint" style="font-size:11px;color:var(--ds-accent,#25d366);margin-top:4px;display:none;background:rgba(37,211,102,0.08);padding:4px 8px;border-radius:6px;border:1px solid rgba(37,211,102,0.2);"></div>
+        <div id="ta-rate-chips" style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;align-items:center;">
+          <span style="font-size:10px;color:var(--ds-text2,#888);margin-right:2px;">কুইক রেট:</span>
+          <button class="ds-chip-btn ds-chip-rate" type="button" data-rate="500">৳৫০০</button>
+          <button class="ds-chip-btn ds-chip-rate" type="button" data-rate="600">৳৬০০</button>
+          <button class="ds-chip-btn ds-chip-rate" type="button" data-rate="650">৳৬৫০</button>
+          <button class="ds-chip-btn ds-chip-rate" type="button" data-rate="700">৳৭০০</button>
+          <button class="ds-chip-btn ds-chip-rate" type="button" data-rate="750">৳৭৫০</button>
+          <button class="ds-chip-btn ds-chip-rate" type="button" data-rate="800">৳৮০০</button>
+          <button class="ds-chip-btn ds-chip-rate" type="button" data-rate="1100">৳১১০০</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:6px;cursor:pointer;">
           <input type="checkbox" id="ta-save-custom-rate">
           <span>এই কাস্টমারের জন্য এই রেট সেভ রাখুন (Custom Rate)</span>
         </label>
@@ -1998,18 +2009,33 @@
             }
           }
 
-          // Auto lookup product price (e.g. New Birth)
+          // Smart auto rate suggestion based on customer and office address
           const searchKeyword = app.isBirth ? 'New Birth' : 'Birth';
           pqEl.value = searchKeyword;
           try {
-            const res = await apiGet('ajax_products_lookup', { q: searchKeyword, customer_id: c.id });
-            if (res.ok && Array.isArray(res.products) && res.products.length > 0) {
-              const p = res.products.find(x => x.name.toLowerCase().includes('new birth')) || res.products[0];
-              selProduct = { id: p.id, name: p.name, price: Number(p.price || 0) };
-              pqEl.value = p.name;
-              amtEl.value = String(p.price);
-            } else if (!amtEl.value || amtEl.value === '0') {
-              amtEl.value = '650';
+            const sRes = await apiGet('ajax_suggest_rate', {
+              customer_id: c.id,
+              address: app.address || '',
+              is_birth: app.isBirth ? 1 : 0
+            });
+            if (sRes && sRes.ok && Number(sRes.suggested_rate) > 0) {
+              amtEl.value = String(sRes.suggested_rate);
+              const hintEl = ov.querySelector('#ta-rate-hint');
+              if (hintEl) {
+                const label = sRes.reason ? esc(sRes.reason) : esc(sRes.office_name || '');
+                hintEl.innerHTML = `💡 অটো-সাজেস্ট রেট: <b>৳${sRes.suggested_rate}</b> (${label})`;
+                hintEl.style.display = 'block';
+              }
+            } else {
+              const res = await apiGet('ajax_products_lookup', { q: searchKeyword, customer_id: c.id });
+              if (res.ok && Array.isArray(res.products) && res.products.length > 0) {
+                const p = res.products.find(x => x.name.toLowerCase().includes('new birth')) || res.products[0];
+                selProduct = { id: p.id, name: p.name, price: Number(p.price || 0) };
+                pqEl.value = p.name;
+                amtEl.value = String(p.price);
+              } else if (!amtEl.value || amtEl.value === '0') {
+                amtEl.value = '650';
+              }
             }
           } catch {
             if (!amtEl.value || amtEl.value === '0') amtEl.value = '650';
@@ -2038,6 +2064,27 @@
             ov.querySelector('#ta-paste-box')?.classList.add('ds-hidden');
           } else {
             toast('মেসেজটি সঠিক ফরম্যাটে নেই (Application ID, Name ইত্যাদি দিন)');
+          }
+        });
+
+        // Wire up quick rate chips
+        ov.querySelectorAll('.ds-chip-rate').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const r = btn.dataset.rate || '';
+            amtEl.value = r;
+            const hintEl = ov.querySelector('#ta-rate-hint');
+            if (hintEl) {
+              hintEl.innerHTML = `রেট সিলেক্ট করা হয়েছে: <b>৳${r}</b> (সেভ করলে এই অফিসের জন্য মনে রাখা হবে)`;
+              hintEl.style.display = 'block';
+            }
+          });
+        });
+
+        amtEl.addEventListener('input', () => {
+          const hintEl = ov.querySelector('#ta-rate-hint');
+          if (hintEl && amtEl.value) {
+            hintEl.innerHTML = `রেট এডিট করা হয়েছে: <b>৳${amtEl.value}</b> (সেভ করলে এই অফিসের জন্য মনে রাখা হবে)`;
+            hintEl.style.display = 'block';
           }
         });
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Digital Store – CRM for WhatsApp",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Professional CRM assistant for WhatsApp Web. Manage customers, sales, collections, and admin workflows directly from chat.",
   "icons": {
     "16": "icons/icon16.png",

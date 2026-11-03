@@ -20,6 +20,7 @@ if ($ownerId <= 0) {
 }
 
 app_ensure_customer_tasks_table();
+app_ensure_customer_office_rates_table();
 
 $body = file_get_contents('php://input');
 $data = json_decode(is_string($body) ? $body : '', true) ?: [];
@@ -53,6 +54,34 @@ try {
         ':amount' => $amount,
     ]);
     $taskId = (int)db()->lastInsertId();
+
+    // Auto-learn customer office rate for future suggestions
+    if ($amount > 0 && $notes !== '') {
+        try {
+            $officeInfo = app_extract_office_info($notes);
+            $namesToSave = array_unique(array_filter([$officeInfo['name'] ?? '', $officeInfo['city_corp'] ?? '']));
+            if (!empty($namesToSave) && ($officeInfo['name'] ?? '') !== 'Default') {
+                $stmtRate = db()->prepare('
+                    INSERT INTO customer_office_rates (customer_id, admin_id, office_name, rate, updated_at)
+                    VALUES (:cid, :aid, :office, :rate, datetime(\'now\'))
+                    ON CONFLICT(customer_id, office_name, admin_id) DO UPDATE SET 
+                        rate = excluded.rate,
+                        updated_at = datetime(\'now\')
+                ');
+                foreach ($namesToSave as $oname) {
+                    $stmtRate->execute([
+                        ':cid' => $customerId,
+                        ':aid' => $ownerId,
+                        ':office' => $oname,
+                        ':rate' => $amount,
+                    ]);
+                }
+            }
+        } catch (Throwable $re) {
+            // Silently continue if rate learning has non-fatal error
+        }
+    }
+
     app_audit_log('create', 'task', $taskId, [
         'customer_id' => $customerId,
         'task_name' => $taskName,
