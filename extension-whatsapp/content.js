@@ -25,6 +25,7 @@
   const nk = key => String(key || '').trim().toLowerCase();
 
   const _duesCache = new Map();
+  const _tasksCache = new Map();
   let _currentCustomer = null;
 
   async function pasteToChat(text, autoSend = false) {
@@ -771,16 +772,23 @@
     }
 
     const c = lookup.customer, s = lookup.summary;
-    _currentCustomer = { id: c.id, name: c.name, phone: c.phone, due: s?.total_due, category: c.category };
-    if (c.phone) _duesCache.set(normalizePhone(c.phone), Number(s?.total_due || 0));
-    if (c.name) _duesCache.set(nk(c.name), Number(s?.total_due || 0));
+    const notes = Array.isArray(lookup.notes) ? lookup.notes : [];
+    const pendingTasks = Array.isArray(lookup.pending_tasks) ? lookup.pending_tasks : [];
+    const pendingTaskCount = Number(lookup.pending_task_count || pendingTasks.length || 0);
+
+    _currentCustomer = { id: c.id, name: c.name, phone: c.phone, due: s?.total_due, category: c.category, taskCount: pendingTaskCount };
+    if (c.phone) {
+      _duesCache.set(normalizePhone(c.phone), Number(s?.total_due || 0));
+      _tasksCache.set(normalizePhone(c.phone), pendingTaskCount);
+    }
+    if (c.name) {
+      _duesCache.set(nk(c.name), Number(s?.total_due || 0));
+      _tasksCache.set(nk(c.name), pendingTaskCount);
+    }
     applyChatBadges();
 
     const workspace = await apiBootstrap();
     const canWrite = !!(workspace && workspace.ok && workspace.can_write);
-    const notes = Array.isArray(lookup.notes) ? lookup.notes : [];
-    const pendingTasks = Array.isArray(lookup.pending_tasks) ? lookup.pending_tasks : [];
-    const pendingTaskCount = Number(lookup.pending_task_count || pendingTasks.length || 0);
     const sales = Array.isArray(lookup.recent_sales) ? lookup.recent_sales : [];
     const evts = (ledger?.ok && Array.isArray(ledger.events)) ? ledger.events : [];
     const chatMeta = getSelectedChatMeta();
@@ -2471,13 +2479,17 @@
     return panel;
   }
 
-  // ── Chat List Dues Badges ──────────────────────────────────────────────────
-  async function refreshDuesCache() {
+  // ── Chat List Badges (Dues & Pending Tasks) ────────────────────────────────
+  async function refreshBadgesCache() {
     try {
-      const res = await apiGet('ajax_dues_list');
-      if (res && res.ok && Array.isArray(res.dues)) {
+      const [duesRes, tasksRes] = await Promise.all([
+        apiGet('ajax_dues_list'),
+        apiGet('ajax_task_list', { status: 'pending' })
+      ]);
+
+      if (duesRes && duesRes.ok && Array.isArray(duesRes.dues)) {
         _duesCache.clear();
-        for (const d of res.dues) {
+        for (const d of duesRes.dues) {
           const dueAmt = Number(d.due || 0);
           if (dueAmt > 0.01) {
             const ph = normalizePhone(d.phone || '');
@@ -2486,14 +2498,25 @@
             if (nm) _duesCache.set(nm, dueAmt);
           }
         }
-        applyChatBadges();
       }
+
+      if (tasksRes && tasksRes.ok && Array.isArray(tasksRes.tasks)) {
+        _tasksCache.clear();
+        for (const t of tasksRes.tasks) {
+          const ph = normalizePhone(t.customer_phone || '');
+          const nm = nk(t.customer_name || '');
+          if (ph) _tasksCache.set(ph, (_tasksCache.get(ph) || 0) + 1);
+          if (nm) _tasksCache.set(nm, (_tasksCache.get(nm) || 0) + 1);
+        }
+      }
+
+      applyChatBadges();
     } catch (e) {}
   }
 
   function applyChatBadges() {
     const pane = document.querySelector('#pane-side');
-    if (pane && _duesCache.size > 0) {
+    if (pane && (_duesCache.size > 0 || _tasksCache.size > 0)) {
       const rows = pane.querySelectorAll('div[role="row"], div[role="listitem"]');
       for (const row of rows) {
         const titleEl = row.querySelector('span[dir="auto"], span[title], div[title]');
@@ -2503,7 +2526,10 @@
         const nameKey = nk(titleText);
 
         const due = (ph && _duesCache.get(ph)) || _duesCache.get(nameKey);
+        const taskCount = (ph && _tasksCache.get(ph)) || _tasksCache.get(nameKey) || 0;
+
         let badge = row.querySelector('.ds-chat-badge-due');
+        let taskBadge = row.querySelector('.ds-chat-badge-task');
 
         if (due && due > 0.01) {
           if (!badge) {
@@ -2517,21 +2543,37 @@
         } else if (badge) {
           badge.remove();
         }
+
+        if (taskCount && taskCount > 0) {
+          if (!taskBadge) {
+            taskBadge = document.createElement('span');
+            taskBadge.className = 'ds-chat-badge ds-chat-badge-task';
+            const targetParent = titleEl.parentElement;
+            if (targetParent) targetParent.appendChild(taskBadge);
+            else row.appendChild(taskBadge);
+          }
+          taskBadge.textContent = `📋 ${taskCount}টি কাজ`;
+        } else if (taskBadge) {
+          taskBadge.remove();
+        }
       }
     }
 
-    // Active Chat Header (#main header) Due Badge
+    // Active Chat Header (#main header) Due & Pending Task Badges
     try {
       const mainHeader = document.querySelector('#main header');
       if (mainHeader) {
         let hBadge = mainHeader.querySelector('.ds-header-chat-badge');
+        let hTaskBadge = mainHeader.querySelector('.ds-header-chat-badge-task');
         const headerTitle = mainHeader.querySelector('span[dir="auto"][title], div[role="button"] span[title], span[dir="auto"]');
         if (headerTitle) {
           const ht = (headerTitle.getAttribute('title') || headerTitle.textContent || '').trim();
           const hph = looksLikePhone(ht) ? normalizePhone(ht) : '';
           const nameK = nk(ht);
-          
+
           let hDue = 0;
+          let hTask = 0;
+
           if (hph && _duesCache.has(hph)) {
             hDue = _duesCache.get(hph);
           } else if (nameK && _duesCache.has(nameK)) {
@@ -2539,7 +2581,15 @@
           } else if (_currentCustomer && ((_currentCustomer.phone && normalizePhone(_currentCustomer.phone) === hph) || (_currentCustomer.name && nk(_currentCustomer.name) === nameK))) {
             hDue = Number(_currentCustomer.due || 0);
           }
-          
+
+          if (hph && _tasksCache.has(hph)) {
+            hTask = _tasksCache.get(hph);
+          } else if (nameK && _tasksCache.has(nameK)) {
+            hTask = _tasksCache.get(nameK);
+          } else if (_currentCustomer && ((_currentCustomer.phone && normalizePhone(_currentCustomer.phone) === hph) || (_currentCustomer.name && nk(_currentCustomer.name) === nameK))) {
+            hTask = Number(_currentCustomer.taskCount || 0);
+          }
+
           if (hDue && hDue > 0.01) {
             if (!hBadge) {
               hBadge = document.createElement('span');
@@ -2550,8 +2600,24 @@
           } else if (hBadge) {
             hBadge.remove();
           }
-        } else if (hBadge) {
-          hBadge.remove();
+
+          if (hTask && hTask > 0) {
+            if (!hTaskBadge) {
+              hTaskBadge = document.createElement('span');
+              hTaskBadge.className = 'ds-header-chat-badge-task';
+              headerTitle.parentElement?.appendChild(hTaskBadge);
+              hTaskBadge.addEventListener('click', () => {
+                const el = document.querySelector('.ds-pending-tasks-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              });
+            }
+            hTaskBadge.textContent = `📋 ${hTask}টি পেন্ডিং কাজ`;
+          } else if (hTaskBadge) {
+            hTaskBadge.remove();
+          }
+        } else {
+          if (hBadge) hBadge.remove();
+          if (hTaskBadge) hTaskBadge.remove();
         }
       }
     } catch (e) {}
@@ -2562,7 +2628,8 @@
     const panel = ensurePanel();
     panel.classList.remove('ds-hidden');
     await refreshToolsOverview(panel, forceRefresh);
-    refreshDuesCache();
+    refreshBadgesCache();
+    setInterval(refreshBadgesCache, 60000);
 
     const id = await getIdentity();
     const key = id ? id.key : '__none__';

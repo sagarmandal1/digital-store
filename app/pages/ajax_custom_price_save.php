@@ -73,3 +73,4 @@ try {
 } catch (Throwable $e) {
     app_ext_api_send_json(500, ['ok' => false, 'error' => 'Failed to save custom price']);
 }
+
