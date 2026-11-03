@@ -36,6 +36,7 @@ $allowed = [
     'customers' => 'customers.php',
     'products' => 'products.php',
     'services' => 'services.php',
+    'sellers' => 'sellers.php',
     'pricing' => 'pricing.php',
     'sales' => 'sales.php',
     'dues' => 'dues.php',

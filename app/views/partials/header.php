@@ -59,6 +59,7 @@ function page_label(string $page): string
         'customers' => 'Customers',
         'products' => 'Products',
         'services' => 'Services & Workflow',
+        'sellers' => 'Sellers / Vendors',
         'pricing' => 'Custom Pricing',
         'sales' => 'Sales',
         'dues' => 'Collections',
@@ -122,6 +123,7 @@ $fullTitle = $pageLabel . ' | ' . $appName;
                     <a class="nav-link <?= e(nav_active('customers', $currentPage)) ?>" href="index.php?page=customers"><i class="bi bi-people me-2 nav-pill-icon"></i>Customers</a>
                     <a class="nav-link <?= e(nav_active('products', $currentPage)) ?>" href="index.php?page=products"><i class="bi bi-box-seam me-2 nav-pill-icon"></i>Products</a>
                     <a class="nav-link <?= e(nav_active('services', $currentPage)) ?>" href="index.php?page=services"><i class="bi bi-clipboard2-check me-2 nav-pill-icon"></i>Services & Workflow</a>
+                    <a class="nav-link <?= e(nav_active('sellers', $currentPage)) ?>" href="index.php?page=sellers"><i class="bi bi-truck me-2 nav-pill-icon"></i>Sellers / Vendors</a>
                     <a class="nav-link <?= e(nav_active('pricing', $currentPage)) ?>" href="index.php?page=pricing"><i class="bi bi-tag me-2 nav-pill-icon"></i>Custom Pricing</a>
                     <a class="nav-link <?= e(nav_active('sales', $currentPage)) ?>" href="index.php?page=sales"><i class="bi bi-receipt me-2 nav-pill-icon"></i>Sales</a>
                     <a class="nav-link <?= e(nav_active('dues', $currentPage)) ?>" href="index.php?page=dues"><i class="bi bi-cash-coin me-2 nav-pill-icon"></i>Due</a>
@@ -154,6 +156,7 @@ $fullTitle = $pageLabel . ' | ' . $appName;
                 <a class="nav-link <?= e(nav_active('customers', $currentPage)) ?>" href="index.php?page=customers"><i class="bi bi-people me-2 nav-pill-icon"></i>Customers</a>
                 <a class="nav-link <?= e(nav_active('products', $currentPage)) ?>" href="index.php?page=products"><i class="bi bi-box-seam me-2 nav-pill-icon"></i>Products</a>
                 <a class="nav-link <?= e(nav_active('services', $currentPage)) ?>" href="index.php?page=services"><i class="bi bi-clipboard2-check me-2 nav-pill-icon"></i>Services & Workflow</a>
+                <a class="nav-link <?= e(nav_active('sellers', $currentPage)) ?>" href="index.php?page=sellers"><i class="bi bi-truck me-2 nav-pill-icon"></i>Sellers / Vendors</a>
                 <a class="nav-link <?= e(nav_active('pricing', $currentPage)) ?>" href="index.php?page=pricing"><i class="bi bi-tag me-2 nav-pill-icon"></i>Custom Pricing</a>
                 <a class="nav-link <?= e(nav_active('sales', $currentPage)) ?>" href="index.php?page=sales"><i class="bi bi-receipt me-2 nav-pill-icon"></i>Sales</a>
                 <a class="nav-link <?= e(nav_active('dues', $currentPage)) ?>" href="index.php?page=dues"><i class="bi bi-cash-coin me-2 nav-pill-icon"></i>Due</a>
