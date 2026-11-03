@@ -4,8 +4,23 @@ declare(strict_types=1);
 
 function app_client_ip(): string
 {
-    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
-    return $ip !== '' ? $ip : 'unknown';
+    $headers = [
+        'HTTP_CF_CONNECTING_IP',
+        'HTTP_X_REAL_IP',
+        'HTTP_X_FORWARDED_FOR',
+        'REMOTE_ADDR',
+    ];
+    foreach ($headers as $h) {
+        if (!empty($_SERVER[$h])) {
+            $raw = (string)$_SERVER[$h];
+            $ips = explode(',', $raw);
+            $ip = trim($ips[0]);
+            if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                return $ip;
+            }
+        }
+    }
+    return (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown');
 }
 
 function app_rate_limit_key(string $action, string $suffix = ''): string

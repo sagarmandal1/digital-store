@@ -579,6 +579,29 @@
   color: var(--warn);
 }
 
+.ds-kpi-sub {
+  font-size: 9.5px;
+  color: var(--text3);
+  margin-top: 3px;
+  line-height: 1.25;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-kpi-sub.green {
+  color: var(--green);
+}
+
+.ds-kpi-sub.red {
+  color: var(--red);
+}
+
+.ds-kpi-sub.orange {
+  color: var(--warn);
+}
+
 /* ── Quick Action Grid ───────────────────────────────────────────────────── */
 .ds-inline-actions {
   display: grid;
@@ -969,9 +992,36 @@
   gap: 6px;
 }
 
-/* ── Pending Tasks in Customer View ──────────────────────────────────────── */
+/* ── Tasks & Dues Sections in Customer View ───────────────────────────────── */
+.ds-counter-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 10px;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.4;
+}
+
+.ds-counter-badge.green {
+  background: var(--green);
+}
+
+.ds-counter-badge.red {
+  background: var(--red);
+}
+
+.ds-counter-badge.orange {
+  background: var(--warn);
+}
+
+.ds-counter-badge.blue {
+  background: var(--blue);
+}
+
 .ds-pending-tasks-section {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .ds-pending-tasks-list {
@@ -988,6 +1038,151 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* ── Due Sales Section ───────────────────────────────────────────────────── */
+.ds-due-section {
+  margin-bottom: 12px;
+}
+
+.ds-due-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ds-due-card {
+  background: var(--surface2);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-left: 3px solid #ef4444;
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  transition: all 0.15s ease;
+}
+
+.ds-due-card:hover {
+  background: var(--surface3);
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.ds-due-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+
+.ds-invoice-tag {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  display: inline-block;
+}
+
+.ds-due-date {
+  font-size: 10px;
+  color: var(--text3);
+  margin-left: 5px;
+}
+
+.ds-due-amount-badge {
+  font-size: 11px;
+  font-weight: 800;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.ds-due-breakdown {
+  display: flex;
+  gap: 12px;
+  font-size: 10.5px;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+
+.ds-due-breakdown b.green {
+  color: var(--green);
+}
+
+.ds-due-notes {
+  font-size: 10.5px;
+  color: var(--text3);
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.ds-due-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.ds-chip-pay {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border: none !important;
+}
+
+.ds-chip-pay:hover {
+  filter: brightness(1.1);
+}
+
+.ds-chip-remind {
+  background: rgba(56, 189, 248, 0.12) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  font-weight: 600 !important;
+}
+
+.ds-chip-remind:hover {
+  background: rgba(56, 189, 248, 0.2) !important;
+}
+
+/* ── Delivered Tasks Section ─────────────────────────────────────────────── */
+.ds-delivered-tasks-section {
+  margin-bottom: 12px;
+}
+
+.ds-task-item-delivered {
+  border-left: 3px solid #10b981 !important;
+  background: rgba(16, 185, 129, 0.04) !important;
+  border-radius: var(--r-sm) !important;
+  padding: 8px 10px !important;
+  margin-bottom: 6px !important;
+}
+
+.ds-mini-badge {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.ds-badge-paid {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.ds-badge-due {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 /* ── Modal Dialog System ─────────────────────────────────────────────────── */
@@ -1406,4 +1601,138 @@
 
 .ds-hidden {
   display: none !important;
+}
+
+/* ── Floating CRM Launcher Pill (Visible when panel is closed) ───────────── */
+#ds-wa-launcher {
+  position: fixed;
+  right: 0;
+  top: 140px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #064e3b 100%);
+  color: #ffffff;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-right: none;
+  border-radius: 20px 0 0 20px;
+  padding: 8px 12px 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  z-index: 2147483646;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 11.5px;
+  font-weight: 800;
+  box-shadow: -2px 4px 14px rgba(0, 0, 0, 0.45);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  user-select: none;
+}
+
+#ds-wa-launcher:hover {
+  transform: translateX(-4px);
+  background: linear-gradient(135deg, #1e293b 0%, #312e81 60%, #059669 100%);
+  box-shadow: -4px 6px 18px rgba(16, 185, 129, 0.45);
+}
+
+#ds-wa-launcher .ds-launcher-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #10b981;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+#ds-wa-launcher .ds-launcher-text {
+  letter-spacing: 0.03em;
+  color: #f8fafc;
+}
+
+/* ── Seller Tag & UI ──────────────────────────────────────────────────────── */
+.ds-seller-tag {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.ds-chip-seller {
+  background: rgba(168, 85, 247, 0.15) !important;
+  color: #c084fc !important;
+  border: 1px solid rgba(168, 85, 247, 0.3) !important;
+  font-weight: 600 !important;
+}
+
+.ds-chip-seller:hover {
+  background: rgba(168, 85, 247, 0.25) !important;
+}
+
+.ds-seller-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ds-seller-name {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.ds-seller-phone {
+  font-size: 10.5px;
+  color: var(--text3);
+}
+
+.ds-return-customer-banner {
+  position: fixed;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  color: #ffffff;
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  padding: 8px 16px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 9999999;
+  animation: fadeIn 0.2s ease;
+}
+
+.ds-return-customer-btn {
+  background: #6366f1;
+  color: #ffffff;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ds-return-customer-btn:hover {
+  background: #4f46e5;
 }

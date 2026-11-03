@@ -227,17 +227,16 @@ function app_ext_api_scope_admin_id(int $tokenAdminId): int
 
 function app_ext_api_require_token_admin_id(): int
 {
-    $rl = app_rate_limit_allow(app_rate_limit_key('ext_api_auth'), 60, 300);
-    if (!($rl['ok'] ?? true)) {
-        app_ext_api_send_json(429, [
-            'ok' => false,
-            'error' => 'Too many API auth attempts',
-            'retry_after' => (int)($rl['retry_after'] ?? 0),
-        ]);
-    }
-
     $adminId = app_ext_api_token_admin_id();
     if ($adminId <= 0) {
+        $rl = app_rate_limit_allow(app_rate_limit_key('ext_api_auth_fail'), 30, 300);
+        if (!($rl['ok'] ?? true)) {
+            app_ext_api_send_json(429, [
+                'ok' => false,
+                'error' => 'Too many failed API auth attempts. Please wait.',
+                'retry_after' => (int)($rl['retry_after'] ?? 0),
+            ]);
+        }
         app_ext_api_send_json(401, ['ok' => false, 'error' => 'Unauthorized']);
     }
     return $adminId;
@@ -308,6 +307,37 @@ function app_ensure_customer_office_rates_table(): void
             FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
         )');
         db()->exec('CREATE INDEX IF NOT EXISTS idx_cust_office_rates ON customer_office_rates(customer_id, office_name, admin_id)');
+    } catch (Throwable $e) {
+        return;
+    }
+}
+
+function app_ensure_sellers_table(): void
+{
+    if (!app_db_initialized()) {
+        return;
+    }
+    try {
+        db()->exec('CREATE TABLE IF NOT EXISTS sellers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_id INTEGER NOT NULL DEFAULT 0,
+            name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            service_type TEXT DEFAULT \'\',
+            notes TEXT DEFAULT \'\',
+            created_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
+        )');
+        db()->exec('CREATE INDEX IF NOT EXISTS idx_sellers_admin ON sellers(admin_id)');
+
+        // Ensure customer_tasks has seller columns
+        $cols = db()->query("PRAGMA table_info(customer_tasks)")->fetchAll(PDO::FETCH_ASSOC);
+        $names = array_column($cols, 'name');
+        if (!in_array('seller_id', $names, true)) {
+            db()->exec('ALTER TABLE customer_tasks ADD COLUMN seller_id INTEGER DEFAULT NULL');
+        }
+        if (!in_array('seller_name', $names, true)) {
+            db()->exec('ALTER TABLE customer_tasks ADD COLUMN seller_name TEXT DEFAULT \'\'');
+        }
     } catch (Throwable $e) {
         return;
     }

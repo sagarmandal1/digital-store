@@ -122,15 +122,39 @@ try {
 
     // Pending tasks
     app_ensure_customer_tasks_table();
+    app_ensure_sellers_table();
     $tasksStmt = db()->prepare("
-        SELECT id, task_name, notes, amount, status, sale_id, created_at, delivered_at
+        SELECT id, task_name, notes, amount, status, sale_id, seller_id, seller_name, created_at, delivered_at
         FROM customer_tasks
         WHERE customer_id = :cid AND (admin_id = :aid OR :aid = 0) AND status = 'pending'
         ORDER BY created_at DESC
-        LIMIT 20
+        LIMIT 30
     ");
     $tasksStmt->execute([':cid' => $cid, ':aid' => $aid]);
     $pendingTasks = $tasksStmt->fetchAll() ?: [];
+
+    // Delivered tasks
+    $deliveredStmt = db()->prepare("
+        SELECT t.id, t.task_name, t.notes, t.amount, t.status, t.sale_id, t.seller_id, t.seller_name, t.created_at, t.delivered_at,
+               s.invoice_no, s.total_sell, s.paid_amount
+        FROM customer_tasks t
+        LEFT JOIN sales s ON s.id = t.sale_id
+        WHERE t.customer_id = :cid AND (t.admin_id = :aid OR :aid = 0) AND t.status = 'delivered'
+        ORDER BY t.delivered_at DESC, t.id DESC
+        LIMIT 30
+    ");
+    $deliveredStmt->execute([':cid' => $cid, ':aid' => $aid]);
+    $deliveredTasks = $deliveredStmt->fetchAll() ?: [];
+
+    // Due sales (invoices with unpaid balance)
+    $dueSalesStmt = db()->prepare("
+        SELECT id, invoice_no, sale_date, total_sell, paid_amount, (total_sell - paid_amount) AS due_amount, notes
+        FROM sales
+        WHERE customer_id = :cid AND (admin_id = :aid OR :aid = 0) AND (total_sell - paid_amount) > 0.01
+        ORDER BY sale_date DESC, id DESC
+    ");
+    $dueSalesStmt->execute([':cid' => $cid, ':aid' => $aid]);
+    $dueSales = $dueSalesStmt->fetchAll() ?: [];
 
     echo json_encode([
         'ok' => true,
@@ -147,8 +171,15 @@ try {
             'total_sell' => $sell,
             'total_paid' => $paid,
             'total_due' => $due,
+            'due_sales_count' => count($dueSales),
+            'pending_task_count' => count($pendingTasks),
+            'delivered_task_count' => count($deliveredTasks),
+            'total_task_count' => count($pendingTasks) + count($deliveredTasks),
         ],
         'pending_task_count' => count($pendingTasks),
+        'delivered_task_count' => count($deliveredTasks),
+        'total_task_count' => count($pendingTasks) + count($deliveredTasks),
+        'due_sales_count' => count($dueSales),
         'pending_tasks' => array_map(function ($t) {
             return [
                 'id' => (int)$t['id'],
@@ -156,9 +187,41 @@ try {
                 'notes' => (string)($t['notes'] ?? ''),
                 'amount' => to_float($t['amount']),
                 'status' => (string)$t['status'],
+                'seller_id' => $t['seller_id'] !== null ? (int)$t['seller_id'] : null,
+                'seller_name' => (string)($t['seller_name'] ?? ''),
                 'created_at' => (string)$t['created_at'],
             ];
         }, $pendingTasks),
+        'delivered_tasks' => array_map(function ($t) {
+            $tsell = to_float($t['total_sell'] ?? 0);
+            $tpaid = to_float($t['paid_amount'] ?? 0);
+            return [
+                'id' => (int)$t['id'],
+                'task_name' => (string)$t['task_name'],
+                'notes' => (string)($t['notes'] ?? ''),
+                'amount' => to_float($t['amount']),
+                'status' => (string)$t['status'],
+                'seller_id' => $t['seller_id'] !== null ? (int)$t['seller_id'] : null,
+                'seller_name' => (string)($t['seller_name'] ?? ''),
+                'sale_id' => $t['sale_id'] !== null ? (int)$t['sale_id'] : null,
+                'invoice_no' => (string)($t['invoice_no'] ?? ''),
+                'is_paid' => ($tsell > 0 && ($tsell - $tpaid) <= 0.01),
+                'due_amount' => max(0.0, $tsell - $tpaid),
+                'created_at' => (string)$t['created_at'],
+                'delivered_at' => (string)($t['delivered_at'] ?? ''),
+            ];
+        }, $deliveredTasks),
+        'due_sales' => array_map(function ($s) {
+            return [
+                'id' => (int)$s['id'],
+                'invoice_no' => (string)$s['invoice_no'],
+                'sale_date' => (string)$s['sale_date'],
+                'total_sell' => to_float($s['total_sell']),
+                'paid_amount' => to_float($s['paid_amount']),
+                'due_amount' => to_float($s['due_amount']),
+                'notes' => (string)($s['notes'] ?? ''),
+            ];
+        }, $dueSales),
         'recent_sales' => array_map(function ($s) {
             return [
                 'id' => (int)$s['id'],

@@ -25,6 +25,7 @@ $body = file_get_contents('php://input');
 $data = json_decode(is_string($body) ? $body : '', true) ?: [];
 
 $customerId = (int)($data['customer_id'] ?? 0);
+$saleId = (int)($data['sale_id'] ?? 0);
 $amount = to_float($data['amount'] ?? 0);
 $method = trim((string)($data['method'] ?? 'Cash'));
 $date = trim((string)($data['payment_date'] ?? today_iso()));
@@ -43,9 +44,9 @@ try {
         SELECT id, total_sell, paid_amount 
         FROM sales 
         WHERE customer_id = :cid AND admin_id = :aid AND (total_sell - paid_amount) > 0.01 
-        ORDER BY sale_date ASC, id ASC
+        ORDER BY (CASE WHEN id = :sid THEN 0 ELSE 1 END), sale_date ASC, id ASC
     ');
-    $stmt->execute([':cid' => $customerId, ':aid' => $ownerId]);
+    $stmt->execute([':cid' => $customerId, ':aid' => $ownerId, ':sid' => $saleId]);
     $unpaid = $stmt->fetchAll();
 
     $remaining = $amount;

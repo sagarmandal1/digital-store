@@ -29,6 +29,16 @@ $customerId = (int)($data['customer_id'] ?? 0);
 $taskName = trim((string)($data['task_name'] ?? ''));
 $notes = trim((string)($data['notes'] ?? ''));
 $amount = to_float($data['amount'] ?? 0);
+$sellerId = (int)($data['seller_id'] ?? 0);
+$sellerName = trim((string)($data['seller_name'] ?? ''));
+
+if ($sellerId > 0 && $sellerName === '') {
+    try {
+        $sStmt = db()->prepare('SELECT name FROM sellers WHERE id = :sid');
+        $sStmt->execute([':sid' => $sellerId]);
+        $sellerName = (string)($sStmt->fetchColumn() ?: '');
+    } catch (Throwable $e) {}
+}
 
 if ($customerId <= 0 || $taskName === '') {
     app_ext_api_send_json(400, ['ok' => false, 'error' => 'customer_id and task_name required']);
@@ -42,18 +52,91 @@ if (!$stmt->fetchColumn()) {
 }
 
 try {
-    $stmt = db()->prepare('
-        INSERT INTO customer_tasks (customer_id, admin_id, task_name, notes, amount, status)
-        VALUES (:cid, :aid, :name, :notes, :amount, \'pending\')
-    ');
-    $stmt->execute([
-        ':cid' => $customerId,
-        ':aid' => $ownerId,
-        ':name' => $taskName,
-        ':notes' => $notes,
-        ':amount' => $amount,
-    ]);
-    $taskId = (int)db()->lastInsertId();
+    // Extract application ID if present in notes or task name
+    $appId = '';
+    if (preg_match('/(?:Application\s*ID|আবেদন\s*আইডি)[\s:]*([0-9]{5,})/i', $notes, $m)) {
+        $appId = $m[1];
+    } elseif (preg_match('/\((\d{5,})\)/', $taskName, $m)) {
+        $appId = $m[1];
+    }
+
+    $existingPendingId = null;
+    if ($appId !== '') {
+        // 1. Check if already delivered
+        $stmtDelivered = db()->prepare("
+            SELECT id FROM customer_tasks
+            WHERE (notes LIKE :q OR task_name LIKE :q)
+              AND admin_id = :aid
+              AND status != 'pending'
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmtDelivered->execute([
+            ':q' => '%' . $appId . '%',
+            ':aid' => $ownerId,
+        ]);
+        $deliveredId = $stmtDelivered->fetchColumn();
+        if ($deliveredId) {
+            app_ext_api_send_json(400, [
+                'ok' => false,
+                'error' => "আবেদন ID ({$appId}) দিয়ে ইতিমধ্যে একটি কাজ ডেলিভারি সম্পন্ন হয়েছে (কাজ #{$deliveredId})"
+            ]);
+        }
+
+        // 2. Check if already pending for this customer (or admin) - update instead of duplicate
+        $stmtPending = db()->prepare("
+            SELECT id FROM customer_tasks
+            WHERE (notes LIKE :q OR task_name LIKE :q)
+              AND admin_id = :aid
+              AND (customer_id = :cid OR :cid = 0)
+              AND status = 'pending'
+            ORDER BY id DESC LIMIT 1
+        ");
+        $stmtPending->execute([
+            ':q' => '%' . $appId . '%',
+            ':aid' => $ownerId,
+            ':cid' => $customerId,
+        ]);
+        $existingPendingId = $stmtPending->fetchColumn();
+    }
+
+    if ($existingPendingId) {
+        // Update existing pending task
+        $taskId = (int)$existingPendingId;
+        $stmt = db()->prepare('
+            UPDATE customer_tasks
+            SET task_name = :name, notes = :notes, amount = :amount, customer_id = :cid,
+                seller_id = :sid, seller_name = :sname
+            WHERE id = :id AND admin_id = :aid
+        ');
+        $stmt->execute([
+            ':name' => $taskName,
+            ':notes' => $notes,
+            ':amount' => $amount,
+            ':cid' => $customerId,
+            ':sid' => $sellerId > 0 ? $sellerId : null,
+            ':sname' => $sellerName,
+            ':id' => $taskId,
+            ':aid' => $ownerId,
+        ]);
+        $actionType = 'update';
+    } else {
+        // Insert new task
+        $stmt = db()->prepare('
+            INSERT INTO customer_tasks (customer_id, admin_id, task_name, notes, amount, status, seller_id, seller_name)
+            VALUES (:cid, :aid, :name, :notes, :amount, \'pending\', :sid, :sname)
+        ');
+        $stmt->execute([
+            ':cid' => $customerId,
+            ':aid' => $ownerId,
+            ':name' => $taskName,
+            ':notes' => $notes,
+            ':amount' => $amount,
+            ':sid' => $sellerId > 0 ? $sellerId : null,
+            ':sname' => $sellerName,
+        ]);
+        $taskId = (int)db()->lastInsertId();
+        $actionType = 'create';
+    }
 
     // Auto-learn customer office rate for future suggestions
     if ($amount > 0 && $notes !== '') {
@@ -87,12 +170,16 @@ try {
         }
     }
 
-    app_audit_log('create', 'task', $taskId, [
+    app_audit_log($actionType, 'task', $taskId, [
         'customer_id' => $customerId,
         'task_name' => $taskName,
         'amount' => $amount,
     ]);
-    echo json_encode(['ok' => true, 'task_id' => $taskId]);
+    echo json_encode([
+        'ok' => true,
+        'task_id' => $taskId,
+        'updated' => ($actionType === 'update'),
+    ]);
 } catch (Throwable $e) {
     app_ext_api_send_json(500, ['ok' => false, 'error' => 'Task creation failed']);
 }

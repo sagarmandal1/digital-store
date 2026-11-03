@@ -15,7 +15,14 @@
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
-  const digits = str => (String(str || '').match(/\d+/g) || []).join('');
+  const cleanInvisible = str =>
+    String(str || '')
+      .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g, '')
+      .replace(/[\u00A0\u202F\u2007\u2009]/g, ' ')
+      .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-')
+      .trim();
+
+  const digits = str => (cleanInvisible(str).match(/\d+/g) || []).join('');
 
   const normalizePhone = raw => {
     const d = digits(raw);
@@ -27,6 +34,7 @@
   const _duesCache = new Map();
   const _tasksCache = new Map();
   let _currentCustomer = null;
+  let _manuallyClosed = false;
 
   async function pasteToChat(text, autoSend = false) {
     if (!text) return false;
@@ -189,10 +197,10 @@
 
   // Is a string a phone number (not a name)?
   const looksLikePhone = txt => {
-    const t = (txt || '').trim();
-    if (!t || t.length > 22) return false;
-    if (!/^\+?[\d][\d\s\-().]{4,18}$/.test(t)) return false;
-    return !!normalizePhone(t);
+    const cleaned = cleanInvisible(txt);
+    if (!cleaned || cleaned.length > 25) return false;
+    const stripped = cleaned.replace(/[\s\-\(\)\.\+]/g, '');
+    return /^\d{7,15}$/.test(stripped);
   };
 
   // WhatsApp pushnames usually start with ~ (e.g. "~samir khan")
@@ -208,7 +216,11 @@
   // ── DOM fallback (when webpack injection returns nothing) ──────────────────
   const getHeader = () =>
     document.querySelector('#main header') ||
-    document.querySelector('[data-testid="conversation-header"]');
+    document.querySelector('div[role="main"] header') ||
+    document.querySelector('[data-testid="conversation-header"]') ||
+    document.querySelector('#main div[role="region"] header') ||
+    document.querySelector('#main')?.querySelector('header') ||
+    null;
 
   function getHeaderTitle() {
     const h = getHeader();
@@ -220,7 +232,7 @@
     ]) {
       const el = h.querySelector(sel);
       if (!el) continue;
-      const t = (el.getAttribute('title') || el.textContent || '').trim();
+      const t = cleanInvisible(el.getAttribute('title') || el.textContent || '');
       if (t && t.length < 80) return t;
     }
     return '';
@@ -895,6 +907,11 @@
     const notes = Array.isArray(lookup.notes) ? lookup.notes : [];
     const pendingTasks = Array.isArray(lookup.pending_tasks) ? lookup.pending_tasks : [];
     const pendingTaskCount = Number(lookup.pending_task_count || pendingTasks.length || 0);
+    const deliveredTasks = Array.isArray(lookup.delivered_tasks) ? lookup.delivered_tasks : [];
+    const deliveredTaskCount = Number(lookup.delivered_task_count || deliveredTasks.length || 0);
+    const totalTaskCount = Number(lookup.total_task_count || (pendingTaskCount + deliveredTaskCount));
+    const dueSales = Array.isArray(lookup.due_sales) ? lookup.due_sales : [];
+    const dueSalesCount = Number(lookup.due_sales_count || dueSales.length || 0);
 
     _currentCustomer = { id: c.id, name: c.name, phone: c.phone, due: s?.total_due, category: c.category, taskCount: pendingTaskCount };
     if (c.phone) {
@@ -953,21 +970,25 @@
 
       <!-- 4-metric KPI Grid -->
       <div class="ds-kpis">
-        <div class="ds-kpi-box">
-          <div class="ds-kpi-label">🛒 বিক্রয়</div>
-          <div class="ds-kpi-value">${fmt(s.total_sell)}</div>
+        <div class="ds-kpi-box" id="ds-kpi-tasks" style="cursor:pointer;" title="মোট কাজ: ${pendingTaskCount}টি পেন্ডিং, ${deliveredTaskCount}টি ডেলিভারি (ক্লিক করে কাজের তালিকায় যান)">
+          <div class="ds-kpi-label">📋 মোট কাজ</div>
+          <div class="ds-kpi-value ${pendingTaskCount > 0 ? 'orange' : 'green'}">${totalTaskCount}</div>
+          <div class="ds-kpi-sub">${pendingTaskCount} পেন্ডিং • ${deliveredTaskCount} ডেলিভারি</div>
+        </div>
+        <div class="ds-kpi-box" id="ds-kpi-dues" style="cursor:pointer;" title="মোট বকেয়া: ${fmt(s.total_due)} (ক্লিক করে বকেয়া বিলে যান)">
+          <div class="ds-kpi-label">⚠️ মোট বাকি</div>
+          <div class="ds-kpi-value ${dueNumber > 0.01 ? 'red' : 'green'}">${fmt(s.total_due)}</div>
+          <div class="ds-kpi-sub ${dueSalesCount > 0 ? 'red' : 'green'}">${dueSalesCount > 0 ? `${dueSalesCount}টি বিলে বাকি` : 'বকেয়া নেই'}</div>
         </div>
         <div class="ds-kpi-box">
           <div class="ds-kpi-label">💳 পরিশোধ</div>
           <div class="ds-kpi-value green">${fmt(s.total_paid)}</div>
+          <div class="ds-kpi-sub green">জমা হয়েছে</div>
         </div>
         <div class="ds-kpi-box">
-          <div class="ds-kpi-label">⚠️ মোট বাকি</div>
-          <div class="ds-kpi-value ${dueNumber > 0.01 ? 'red' : 'green'}">${fmt(s.total_due)}</div>
-        </div>
-        <div class="ds-kpi-box">
-          <div class="ds-kpi-label">📋 পেন্ডিং কাজ</div>
-          <div class="ds-kpi-value ${pendingTaskCount > 0 ? 'orange' : ''}">${pendingTaskCount}</div>
+          <div class="ds-kpi-label">🛒 মোট বিক্রয়</div>
+          <div class="ds-kpi-value">${fmt(s.total_sell)}</div>
+          <div class="ds-kpi-sub">সর্বমোট বিল</div>
         </div>
       </div>`;
 
@@ -1427,22 +1448,28 @@
     };
 
     // ── Payment Modal ────────────────────────────────────────────────────────
-    const openPaymentModal = () => {
+    const openPaymentModal = (defaultAmt = null, targetSaleId = null, invoiceNo = '') => {
       if (!guardWrite()) return;
       closeMenu();
-      const dueAmt = Number(s.total_due || 0);
-      modal('পেমেন্ট গ্রহণ', `
-        <div class="ds-soft-banner">বর্তমান বকেয়া: <b>${fmt(dueAmt)}</b></div>
+      const dueAmt = (defaultAmt !== null && defaultAmt !== undefined) ? Number(defaultAmt) : Number(s.total_due || 0);
+      const isSpecificInvoice = !!(targetSaleId && invoiceNo);
+
+      modal(isSpecificInvoice ? `বকেয়া আদায় — ${invoiceNo}` : 'পেমেন্ট গ্রহণ', `
+        <div class="ds-soft-banner">
+          ${isSpecificInvoice
+            ? `ইনভয়েস: <b>${esc(invoiceNo)}</b> | বকেয়া: <b>${fmt(dueAmt)}</b>`
+            : `বর্তমান মোট বকেয়া: <b>${fmt(dueAmt)}</b>`}
+        </div>
         <div class="ds-row">
-          <div class="ds-field"><label class="ds-label">পরিমাণ</label>
+          <div class="ds-field"><label class="ds-label">পরিমাণ (৳)</label>
             <input class="ds-input" id="pa" inputmode="decimal" value="${dueAmt > 0 ? fmt(dueAmt) : ''}" placeholder="500"></div>
           <div class="ds-field"><label class="ds-label">পদ্ধতি</label>
             <select class="ds-select" id="pm"><option>Cash</option><option>bKash</option>
               <option>Nagad</option><option>Bank</option><option>Other</option></select></div>
         </div>
         <div class="ds-quick-fill-row">
-          <button class="ds-chip-btn" type="button" id="pfull">Full Due</button>
-          <button class="ds-chip-btn" type="button" id="phalf">Half</button>
+          <button class="ds-chip-btn" type="button" id="pfull">Full Due (${fmt(dueAmt)})</button>
+          ${dueAmt > 10 ? `<button class="ds-chip-btn" type="button" id="phalf">Half (${fmt(Math.round(dueAmt / 2))})</button>` : ''}
         </div>
         <div class="ds-row">
           <div class="ds-field"><label class="ds-label">তারিখ</label>
@@ -1451,7 +1478,7 @@
             <label class="ds-checkbox-label" style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="p-paste" checked style="width:16px;height:16px;margin:0;"> <span>Paste Receipt</span></label></div>
         </div>
         <div class="ds-field"><label class="ds-label">নোট / TrxID</label>
-          <textarea class="ds-textarea" id="pn" placeholder="ঐচ্ছিক"></textarea></div>
+          <textarea class="ds-textarea" id="pn" placeholder="ঐচ্ছিক">${isSpecificInvoice ? `বকেয়া আদায়: ${esc(invoiceNo)}` : ''}</textarea></div>
         <div class="ds-modal-actions">
           <button class="ds-btn ds-btn-secondary ds-btn-block" type="button" id="pc">বাতিল</button>
           <button class="ds-btn ds-btn-block" type="button" id="ps">সেভ</button>
@@ -1461,7 +1488,9 @@
           const today = new Date().toISOString().slice(0, 10);
           ov.querySelector('#pdt').value = today;
           ov.querySelector('#pfull').onclick = () => { payInput.value = fmt(dueAmt); };
-          ov.querySelector('#phalf').onclick = () => { payInput.value = fmt(dueAmt / 2); };
+          if (ov.querySelector('#phalf')) {
+            ov.querySelector('#phalf').onclick = () => { payInput.value = fmt(Math.round(dueAmt / 2)); };
+          }
           ov.querySelector('#pc').onclick = close;
           const psBtn = ov.querySelector('#ps');
           psBtn.onclick = async () => {
@@ -1472,14 +1501,20 @@
             try {
               const method = ov.querySelector('#pm').value || 'Cash';
               const res = await apiPost('ajax_quick_payment', {
-                customer_id: c.id, amount: amt,
+                customer_id: c.id,
+                sale_id: targetSaleId || 0,
+                amount: amt,
                 method,
                 payment_date: ov.querySelector('#pdt').value || today,
                 note: (ov.querySelector('#pn').value || '').trim()
               });
               if (res && res.ok) {
                 const company = _bootInfo?.company_name || 'Digital Store';
-                const payReceipt = `✅ *পেমেন্ট প্রাপ্তি রসিদ*\n👤 *গ্রাহক:* ${c.name}\n💵 *পরিশোধ:* ${fmt(amt)}\n📅 *তারিখ:* ${today}\n💳 *পদ্ধতি:* ${method}\n\nধন্যবাদ,\n*${company}*`;
+                let payReceipt = `✅ *পেমেন্ট প্রাপ্তি রসিদ*\n👤 *গ্রাহক:* ${c.name}\n`;
+                if (isSpecificInvoice) {
+                  payReceipt += `🧾 *ইনভয়েস:* ${invoiceNo}\n`;
+                }
+                payReceipt += `💵 *পরিশোধ:* ${fmt(amt)}\n📅 *তারিখ:* ${today}\n💳 *পদ্ধতি:* ${method}\n\nধন্যবাদ,\n*${company}*`;
 
                 if (ov.querySelector('#p-paste').checked) {
                   await pasteToChat(payReceipt, false);
@@ -1487,11 +1522,12 @@
 
                 setWorkflowState(flowKey, {
                   kind: 'success',
-                  title: 'Payment recorded',
+                  title: isSpecificInvoice ? `Payment for ${invoiceNo}` : 'Payment recorded',
                   meta: `Amount: ${fmt(amt)} (${method})`,
                   items: [
                     { label: 'Collected', value: fmt(amt) },
-                    { label: 'Method', value: method }
+                    { label: 'Method', value: method },
+                    ...(isSpecificInvoice ? [{ label: 'Invoice', value: invoiceNo }] : [])
                   ]
                 });
                 close();
@@ -1594,6 +1630,8 @@
 
     rEl.innerHTML = `
       ${pendingTasksHtml(pendingTasks)}
+      ${dueSalesHtml(dueSales, c)}
+      ${deliveredTasksHtml(deliveredTasks)}
       ${customerTimelineHtml(evts)}
       <div class="ds-subtitle">সাম্প্রতিক লেনদেন</div>
       <div class="ds-list">
@@ -1616,6 +1654,59 @@
             <div class="ds-list-label" style="font-weight:400;">${esc(n.note || '')}</div>
           </div>`).join('')}
         </div>`: ''}`;
+
+    // ── Due sales interaction ─────────────────────────────────────────────────
+    rEl.querySelectorAll('[data-pay-sale]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sid = Number(btn.dataset.paySale || 0);
+        const dueAmt = Number(btn.dataset.due || 0);
+        const inv = btn.dataset.inv || '';
+        openPaymentModal(dueAmt, sid, inv);
+      });
+    });
+
+    rEl.querySelectorAll('[data-remind-sale]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const inv = btn.dataset.inv || '';
+        const dueAmt = Number(btn.dataset.due || 0);
+        const dt = btn.dataset.dt || '';
+        const company = _bootInfo?.company_name || 'Digital Store';
+        const msg = `আসসালামু আলাইকুম ${c.name} ভাই/ম্যাম,\n\nআপনার ইনভয়েস *${inv}* (${dt}) বাবদ বকেয়া রয়েছে: *৳${fmt(dueAmt)}*।\nঅনুগ্রহ করে বকেয়া পরিশোধ করার জন্য অনুরোধ করা হলো।\n\nধন্যবাদ,\n*${company}*`;
+        await pasteToChat(msg, false);
+        toast('বকেয়া রিমাইন্ডার মেসেজ চ্যাটে পেস্ট হয়েছে');
+      });
+    });
+
+    // ── Delivered tasks interaction ───────────────────────────────────────────
+    rEl.querySelectorAll('[data-task-view-delivered]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tid = Number(btn.dataset.taskViewDelivered || 0);
+        const t = deliveredTasks.find(x => x.id === tid);
+        if (!t) return;
+        modal('✅ ডেলিভারি সম্পন্ন কাজের বিবরণ', `
+          <div class="ds-field"><label class="ds-label">কাজের নাম</label>
+            <div style="font-weight:800;font-size:14px;padding:6px 0;">${esc(t.task_name)}</div></div>
+          <div class="ds-row">
+            <div class="ds-field"><label class="ds-label">মূল্য / রেট</label>
+              <div style="font-weight:700;color:var(--ds-accent);padding:6px 0;">${fmt(t.amount)}</div></div>
+            <div class="ds-field"><label class="ds-label">ইনভয়েস নম্বর</label>
+              <div style="font-weight:700;padding:6px 0;">${t.invoice_no ? `<span class="ds-invoice-tag">${esc(t.invoice_no)}</span>` : 'N/A'}</div></div>
+          </div>
+          <div class="ds-row">
+            <div class="ds-field"><label class="ds-label">ডেলিভারি তারিখ</label>
+              <div class="ds-muted" style="padding:6px 0;">${esc(t.delivered_at || t.created_at || '')}</div></div>
+            <div class="ds-field"><label class="ds-label">পেমেন্ট অবস্থা</label>
+              <div style="padding:6px 0;">${t.is_paid ? '<b class="ds-green">✓ সম্পূর্ণ পরিশোধিত</b>' : `<b class="ds-red">⚠️ বাকি: ${fmt(t.due_amount)}</b>`}</div></div>
+          </div>
+          ${t.notes ? `<div class="ds-field"><label class="ds-label">আবেদনের তথ্য / নোট</label>
+            <div style="background:var(--ds-bg2);padding:10px 12px;border-radius:10px;border:1px solid var(--ds-border);
+              font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;">${esc(t.notes)}</div></div>` : ''}
+          <div class="ds-modal-actions">
+            <button class="ds-btn ds-btn-secondary ds-btn-block" type="button" id="tdv-close">বন্ধ করুন</button>
+          </div>`,
+          (ov, close) => { ov.querySelector('#tdv-close').onclick = close; });
+      });
+    });
 
     // ── Pending tasks interaction ─────────────────────────────────────────────
     rEl.querySelectorAll('[data-task-view]').forEach(btn => {
@@ -1651,13 +1742,16 @@
             <div class="ds-field"><label class="ds-label">মূল্য / রেট (৳)</label>
               <input class="ds-input" id="td-amt" inputmode="decimal" value="${t.amount}"></div>
             <div class="ds-field"><label class="ds-label">পেমেন্ট গ্রহণ (৳)</label>
-              <input class="ds-input" id="td-pay" inputmode="decimal" value="${t.amount}" placeholder="0"></div>
+              <input class="ds-input" id="td-pay" inputmode="decimal" value="0" placeholder="0"></div>
           </div>
           <div class="ds-field"><label class="ds-label">পেমেন্ট পদ্ধতি</label>
             <select class="ds-select" id="td-method"><option>Cash</option><option>bKash</option><option>Nagad</option><option>Bank</option><option>Other</option></select></div>
-          <div class="ds-quick-fill-row">
-            <button class="ds-chip-btn" type="button" id="td-full">Full Paid</button>
-            <button class="ds-chip-btn" type="button" id="td-due">Due Sale</button>
+          <div class="ds-quick-fill-row" style="margin-bottom:8px;">
+            <button class="ds-chip-btn" type="button" id="td-due" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.4);font-weight:700;">⚠️ Due Sale (বাকি)</button>
+            <button class="ds-chip-btn" type="button" id="td-full" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.4);font-weight:700;">✓ Full Paid (পরিশোধ)</button>
+          </div>
+          <div id="td-status-hint" style="font-size:11px;font-weight:700;margin-bottom:8px;padding:6px 10px;border-radius:6px;background:rgba(239,68,68,0.08);color:#ef4444;border:1px solid rgba(239,68,68,0.25);">
+            ⚠️ এটি বাকি হিসেবে ডেলিভারি হবে (বকেয়া: ৳${fmt(t.amount)})
           </div>
           <div class="ds-row">
             <div class="ds-field"><label class="ds-label">সেল তারিখ</label>
@@ -1677,38 +1771,70 @@
             ov.querySelector('#td-pdt').value = today;
             const amtInp = ov.querySelector('#td-amt');
             const payInp = ov.querySelector('#td-pay');
-            ov.querySelector('#td-full').onclick = () => { payInp.value = amtInp.value; };
-            ov.querySelector('#td-due').onclick = () => { payInp.value = '0'; };
-            amtInp.addEventListener('input', () => {
-              if (parseAmount(payInp.value) === parseAmount(t.amount)) {
-                payInp.value = amtInp.value;
+            const hintEl = ov.querySelector('#td-status-hint');
+
+            const updateHint = () => {
+              const a = parseAmount(amtInp.value || 0);
+              const p = parseAmount(payInp.value || 0);
+              if (p <= 0) {
+                hintEl.style.background = 'rgba(239,68,68,0.08)';
+                hintEl.style.color = '#ef4444';
+                hintEl.style.borderColor = 'rgba(239,68,68,0.25)';
+                hintEl.innerHTML = `⚠️ এটি <b>সম্পূর্ণ বাকি</b> হিসেবে ডেলিভারি হবে (বকেয়া: ৳${fmt(a)})`;
+              } else if (p >= a) {
+                hintEl.style.background = 'rgba(16,185,129,0.08)';
+                hintEl.style.color = '#10b981';
+                hintEl.style.borderColor = 'rgba(16,185,129,0.25)';
+                hintEl.innerHTML = `✓ এটি <b>সম্পূর্ণ পরিশোধিত</b> হিসেবে ডেলিভারি হবে (জমা: ৳${fmt(p)})`;
+              } else {
+                hintEl.style.background = 'rgba(245,158,11,0.08)';
+                hintEl.style.color = '#f59e0b';
+                hintEl.style.borderColor = 'rgba(245,158,11,0.25)';
+                hintEl.innerHTML = `⚠️ আংশিক জমা (জমা: ৳${fmt(p)} | বাকি: ৳${fmt(a - p)})`;
               }
-            });
+            };
+
+            ov.querySelector('#td-full').onclick = () => { payInp.value = amtInp.value; updateHint(); };
+            ov.querySelector('#td-due').onclick = () => { payInp.value = '0'; updateHint(); };
+            amtInp.addEventListener('input', updateHint);
+            payInp.addEventListener('input', updateHint);
+            updateHint();
+
             ov.querySelector('#td-cancel').onclick = close;
             ov.querySelector('#td-save').onclick = async () => {
+              const saveBtn = ov.querySelector('#td-save');
               const finalAmt = parseAmount(amtInp.value || t.amount);
               const finalPay = parseAmount(payInp.value || 0);
-              const res = await apiPost('ajax_task_deliver', {
-                task_id: t.id,
-                amount: finalAmt,
-                payment_amount: finalPay,
-                payment_method: ov.querySelector('#td-method').value || 'Cash',
-                sale_date: ov.querySelector('#td-sdt').value || today,
-                payment_date: ov.querySelector('#td-pdt').value || today,
-                notes: (ov.querySelector('#td-notes').value || '').trim(),
-              });
-              if (res.ok) {
-                setWorkflowState(flowKey, {
-                  kind: 'success', title: 'Task delivered',
-                  meta: esc(t.task_name),
-                  items: [
-                    { label: 'Invoice', value: String(res.invoice_no || '') },
-                    { label: 'Amount', value: fmt(finalAmt) },
-                    { label: 'Paid', value: fmt(finalPay) },
-                  ]
+              if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'ডেলিভারি হচ্ছে...'; }
+              try {
+                const res = await apiPost('ajax_task_deliver', {
+                  task_id: t.id,
+                  amount: finalAmt,
+                  payment_amount: finalPay,
+                  payment_method: ov.querySelector('#td-method').value || 'Cash',
+                  sale_date: ov.querySelector('#td-sdt').value || today,
+                  payment_date: ov.querySelector('#td-pdt').value || today,
+                  notes: (ov.querySelector('#td-notes').value || '').trim(),
                 });
-                close(); toast('ডেলিভারি সম্পন্ন'); await loadSafe(panel, id);
-              } else toast(esc(res.error || 'ব্যর্থ'));
+                if (res.ok) {
+                  setWorkflowState(flowKey, {
+                    kind: 'success', title: 'Task delivered',
+                    meta: esc(t.task_name),
+                    items: [
+                      { label: 'Invoice', value: String(res.invoice_no || '') },
+                      { label: 'Amount', value: fmt(finalAmt) },
+                      { label: 'Paid', value: fmt(finalPay) },
+                    ]
+                  });
+                  close(); toast('ডেলিভারি সম্পন্ন'); await loadSafe(panel, id);
+                } else {
+                  toast(esc(res.error || 'ব্যর্থ'));
+                  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'ডেলিভারি ✓'; }
+                }
+              } catch (err) {
+                toast('অনুরোধ ব্যর্থ হয়েছে');
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'ডেলিভারি ✓'; }
+              }
             };
           });
       });
@@ -1746,6 +1872,68 @@
               else toast(esc(res.error || 'ব্যর্থ'));
             };
           });
+      });
+    });
+
+    rEl.querySelectorAll('[data-task-delete]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tid = Number(btn.dataset.taskDelete || 0);
+        const t = pendingTasks.find(x => x.id === tid);
+        if (!t || !guardWrite()) return;
+        if (!confirm(`আপনি কি "${t.task_name}" কাজ টি মুছে ফেলতে চান?`)) return;
+        btn.disabled = true;
+        const res = await apiPost('ajax_task_delete', { task_id: t.id });
+        if (res.ok) {
+          toast('কাজটি মুছে ফেলা হয়েছে');
+          await loadSafe(panel, id);
+        } else {
+          toast(esc(res.error || 'মুছতে ব্যর্থ হয়েছে'));
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // ── Send task to seller manually ──────────────────────────────────────────
+    rEl.querySelectorAll('[data-task-send-seller]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tid = Number(btn.dataset.taskSendSeller || 0);
+        const t = pendingTasks.find(x => x.id === tid);
+        if (!t) return;
+        const sellers = await fetchSellers();
+        let targetSeller = sellers.find(s => s.id === t.seller_id) || sellers.find(s => s.name === t.seller_name);
+
+        if (!targetSeller) {
+          if (!sellers.length) {
+            openSellerAddModal(async (newSeller) => {
+              await sendApplicationToSeller(newSeller, t.task_name, t.notes, c);
+            });
+            return;
+          }
+          modal('সেলার নির্বাচন করুন', `
+            <div class="ds-soft-banner">কাজ: <b>${esc(t.task_name)}</b></div>
+            <div class="ds-field"><label class="ds-label">কোন সেলারের কাছে পাঠাবেন?</label>
+              <select class="ds-select" id="ts-seller-sel">
+                <option value="">— সেলার সিলেক্ট করুন —</option>
+                ${sellers.map(s => `<option value="${s.id}">👤 ${esc(s.name)} (${esc(s.phone)})</option>`).join('')}
+              </select>
+            </div>
+            <div class="ds-modal-actions">
+              <button class="ds-btn ds-btn-secondary ds-btn-block" type="button" id="ts-c">বাতিল</button>
+              <button class="ds-btn ds-btn-block" type="button" id="ts-s">পাঠান 🚀</button>
+            </div>`,
+            (ov, close) => {
+              ov.querySelector('#ts-c').onclick = close;
+              ov.querySelector('#ts-s').onclick = async () => {
+                const sid = Number(ov.querySelector('#ts-seller-sel').value || 0);
+                const sObj = sellers.find(x => x.id === sid);
+                if (!sObj) { toast('সেলার সিলেক্ট করুন'); return; }
+                close();
+                await sendApplicationToSeller(sObj, t.task_name, t.notes, c);
+              };
+            });
+        } else {
+          await sendApplicationToSeller(targetSeller, t.task_name, t.notes, c);
+        }
       });
     });
 
@@ -1879,11 +2067,11 @@
       openTaskAddModal(panel, c, id, flowKey, canWrite, detectedApp);
     });
 
-    // ── Tasks button (inline & KPI box) ──────────────────────────────────────
+    // ── Tasks & Dues KPI click navigation ────────────────────────────────────
     const handleTasksClick = () => {
-      if (pendingTaskCount > 0) {
-        const tasksSection = rEl.querySelector('.ds-pending-tasks-section');
-        if (tasksSection) tasksSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const tasksSection = rEl.querySelector('.ds-pending-tasks-section') || rEl.querySelector('.ds-delivered-tasks-section');
+      if (tasksSection) {
+        tasksSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else {
         if (!guardWrite()) return;
         openTaskAddModal(panel, c, id, flowKey, canWrite);
@@ -1891,6 +2079,15 @@
     };
     aEl.querySelector('#ds-tasks-fast')?.addEventListener('click', handleTasksClick);
     cEl.querySelector('#ds-kpi-tasks')?.addEventListener('click', handleTasksClick);
+
+    cEl.querySelector('#ds-kpi-dues')?.addEventListener('click', () => {
+      const dueSection = rEl.querySelector('.ds-due-section');
+      if (dueSection) {
+        dueSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (Number(s.total_due || 0) > 0.01) {
+        openPaymentModal();
+      }
+    });
   }
 
   // ── Task helpers ──────────────────────────────────────────────────────────
@@ -1898,10 +2095,11 @@
     if (!tasks || !tasks.length) return '';
     return `
       <div class="ds-pending-tasks-section">
-        <div class="ds-subtitle" style="display:flex;align-items:center;gap:6px;">
-          📋 অপেক্ষমান কাজ
-          <span style="background:var(--ds-accent);color:#fff;font-size:10px;font-weight:800;
-            padding:1px 7px;border-radius:10px;">${tasks.length}</span>
+        <div class="ds-subtitle" style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <span style="display:flex;align-items:center;gap:6px;">
+            📋 অপেক্ষমান কাজ
+            <span class="ds-counter-badge orange">${tasks.length}টি</span>
+          </span>
         </div>
         <div class="ds-list">
           ${tasks.map(t => `
@@ -1909,7 +2107,11 @@
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div>
                   <div style="font-weight:800;font-size:12px;">${esc(t.task_name)}</div>
-                  <div class="ds-list-sub">${esc(t.created_at || '')}${t.notes ? ' • নোট আছে' : ''}</div>
+                  <div class="ds-list-sub" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px;">
+                    <span>${esc(t.created_at || '')}</span>
+                    ${t.notes ? '<span>• নোট আছে</span>' : ''}
+                    ${t.seller_name ? `<span class="ds-seller-tag">👤 সেলার: ${esc(t.seller_name)}</span>` : ''}
+                  </div>
                 </div>
                 <div style="font-weight:700;color:var(--ds-accent);font-size:12px;white-space:nowrap;">${fmt(t.amount)}</div>
               </div>
@@ -1918,11 +2120,272 @@
                 <button class="ds-chip-btn" data-task-edit="${t.id}" type="button" style="color:var(--ds-text2);">এডিট</button>
                 <button class="ds-chip-btn" data-task-deliver="${t.id}" type="button"
                   style="background:var(--ds-accent);color:#fff;">ডেলিভারি ✓</button>
+                <button class="ds-chip-btn ds-chip-seller" data-task-send-seller="${t.id}" type="button"
+                  title="এই সেলারকে WhatsApp এ কাজ পাঠান">📤 সেলারকে পাঠান</button>
+                <button class="ds-chip-btn" data-task-delete="${t.id}" type="button"
+                  style="color:#ef4444;" title="কাজটি মুছে ফেলুন">মুছুন ✕</button>
               </div>
             </div>
           `).join('')}
         </div>
       </div>`;
+  }
+
+  function dueSalesHtml(dueSales, c) {
+    if (!dueSales || !dueSales.length) return '';
+    const totalDue = dueSales.reduce((sum, s) => sum + Number(s.due_amount || 0), 0);
+    return `
+      <div class="ds-due-section">
+        <div class="ds-subtitle" style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <span style="display:flex;align-items:center;gap:6px;">
+            ⚠️ বকেয়া বিল তালিকা
+            <span class="ds-counter-badge red">${dueSales.length}টি বিল</span>
+          </span>
+          <span style="font-size:11px;font-weight:800;color:var(--red,#ef4444);">বাকি: ${fmt(totalDue)}</span>
+        </div>
+        <div class="ds-due-list">
+          ${dueSales.map(s => `
+            <div class="ds-due-card">
+              <div class="ds-due-header">
+                <div>
+                  <span class="ds-invoice-tag">${esc(s.invoice_no)}</span>
+                  <span class="ds-due-date">${esc(s.sale_date || '')}</span>
+                </div>
+                <div class="ds-due-amount-badge">বাকি: ${fmt(s.due_amount)}</div>
+              </div>
+              <div class="ds-due-breakdown">
+                <span>মোট বিল: <b>${fmt(s.total_sell)}</b></span>
+                <span>জমা: <b class="green">${fmt(s.paid_amount)}</b></span>
+              </div>
+              ${s.notes ? `<div class="ds-due-notes">${esc(s.notes)}</div>` : ''}
+              <div class="ds-due-actions">
+                <button class="ds-chip-btn ds-chip-pay" type="button" data-pay-sale="${s.id}" data-due="${s.due_amount}" data-inv="${esc(s.invoice_no)}">
+                  💵 টাকা গ্রহণ
+                </button>
+                <button class="ds-chip-btn ds-chip-remind" type="button" data-remind-sale="${s.id}" data-due="${s.due_amount}" data-inv="${esc(s.invoice_no)}" data-dt="${esc(s.sale_date || '')}">
+                  💬 রিমাইন্ডার
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+
+  function deliveredTasksHtml(tasks) {
+    if (!tasks || !tasks.length) return '';
+    return `
+      <div class="ds-delivered-tasks-section">
+        <div class="ds-subtitle" style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <span style="display:flex;align-items:center;gap:6px;">
+            ✅ ডেলিভারি সম্পন্ন কাজ
+            <span class="ds-counter-badge green">${tasks.length}টি</span>
+          </span>
+        </div>
+        <div class="ds-list">
+          ${tasks.map(t => {
+            const isPaid = !!t.is_paid;
+            const dueAmt = Number(t.due_amount || 0);
+            return `
+              <div class="ds-list-item ds-task-item-delivered" style="flex-direction:column;align-items:stretch;gap:5px;padding:8px 0;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:12px;color:var(--text);word-break:break-word;">${esc(t.task_name)}</div>
+                    <div class="ds-list-sub" style="margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                      ${t.delivered_at ? `<span>ডেলিভারি: ${esc(t.delivered_at.slice(0, 16))}</span>` : ''}
+                      ${t.invoice_no ? `<span class="ds-invoice-tag">${esc(t.invoice_no)}</span>` : ''}
+                    </div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0;">
+                    <div style="font-weight:800;font-size:12px;color:var(--text);">${fmt(t.amount)}</div>
+                    <div style="margin-top:3px;">
+                      ${isPaid
+                        ? '<span class="ds-mini-badge ds-badge-paid">✓ পরিশোধ</span>'
+                        : `<span class="ds-mini-badge ds-badge-due">⚠️ বাকি ${fmt(dueAmt)}</span>`}
+                    </div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;">
+                  <button class="ds-chip-btn" data-task-view-delivered="${t.id}" type="button">বিস্তারিত</button>
+                  ${!isPaid && t.sale_id ? `
+                    <button class="ds-chip-btn ds-chip-pay" type="button" data-pay-sale="${t.sale_id}" data-due="${dueAmt}" data-inv="${esc(t.invoice_no)}">
+                      💵 বাকি আদায়
+                    </button>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+
+  // ── Seller / Vendor Management ─────────────────────────────────────────────
+  let _cachedSellers = [];
+  let _returnCustomerChat = null;
+
+  async function fetchSellers(force = false) {
+    if (_cachedSellers.length && !force) return _cachedSellers;
+    try {
+      const res = await apiGet('ajax_sellers');
+      if (res && res.ok && Array.isArray(res.sellers)) {
+        _cachedSellers = res.sellers;
+        return _cachedSellers;
+      }
+    } catch (e) {}
+    return _cachedSellers;
+  }
+
+  function openSellerAddModal(onDone = null) {
+    modal('নতুন সেলার / ভেন্ডর যোগ', `
+      <div class="ds-field"><label class="ds-label">সেলার নাম *</label>
+        <input class="ds-input" id="sel-name" placeholder="যেমন: রহিম ভাই (New Birth)"></div>
+      <div class="ds-field"><label class="ds-label">হোয়াটসঅ্যাপ নম্বর *</label>
+        <input class="ds-input" id="sel-phone" placeholder="যেমন: 017xxxxxxxx বা +88017xxxxxxxx"></div>
+      <div class="ds-field"><label class="ds-label">সার্ভিস / ক্যাটাগরি (ঐচ্ছিক)</label>
+        <input class="ds-input" id="sel-st" placeholder="যেমন: New Birth, Server Copy"></div>
+      <div class="ds-field"><label class="ds-label">নোট (ঐচ্ছিক)</label>
+        <textarea class="ds-textarea" id="sel-notes" rows="2" placeholder="রেট বা কাজের বিবরণ..."></textarea></div>
+      <div class="ds-modal-actions">
+        <button class="ds-btn ds-btn-secondary ds-btn-block" type="button" id="sel-c">বাতিল</button>
+        <button class="ds-btn ds-btn-block" type="button" id="sel-s">সেভ করুন</button>
+      </div>`,
+      (ov, close) => {
+        ov.querySelector('#sel-c').onclick = close;
+        const saveBtn = ov.querySelector('#sel-s');
+        saveBtn.onclick = async () => {
+          const name = (ov.querySelector('#sel-name').value || '').trim();
+          const phone = (ov.querySelector('#sel-phone').value || '').trim();
+          const st = (ov.querySelector('#sel-st').value || '').trim();
+          const notes = (ov.querySelector('#sel-notes').value || '').trim();
+          if (!name || !phone) { toast('সেলার নাম ও WhatsApp নম্বর আবশ্যক'); return; }
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'সেভ হচ্ছে...';
+          const res = await apiPost('ajax_sellers', { name, phone, service_type: st, notes });
+          if (res && res.ok && res.seller) {
+            toast('সেলার সফলভাবে সেভ হয়েছে');
+            await fetchSellers(true);
+            close();
+            if (typeof onDone === 'function') onDone(res.seller);
+          } else {
+            toast(esc(res?.error || 'ব্যর্থ'));
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'সেভ করুন';
+          }
+        };
+      });
+  }
+
+  async function sendApplicationToSeller(seller, taskTitle, notes, customer) {
+    if (!seller) return false;
+    const cleanPhone = normalizePhone(seller.phone);
+    if (!cleanPhone && !seller.name) {
+      toast('সেলার নম্বর পাওয়া যায়নি');
+      return false;
+    }
+
+    const fullMsg = `📦 *নতুন কাজের আবেদন*\n` +
+      `━━━━━━━━━━━━━━━━\n` +
+      `*কাজ:* ${taskTitle}\n\n` +
+      `${notes}\n` +
+      `━━━━━━━━━━━━━━━━\n` +
+      `👤 *কাস্টমার:* ${customer?.name || 'N/A'}${customer?.phone ? ` (${customer.phone})` : ''}\n` +
+      `📅 *তারিখ:* ${new Date().toLocaleDateString('en-GB')}`;
+
+    if (customer) {
+      _returnCustomerChat = {
+        phone: customer.phone,
+        name: customer.name
+      };
+    }
+
+    const searchTerm = cleanPhone || seller.name;
+    toast(`সেলার ${seller.name}-এর কাছে পাঠানো হচ্ছে...`);
+
+    let switched = false;
+    try {
+      const searchInput =
+        document.querySelector('#side [contenteditable="true"]') ||
+        document.querySelector('[data-testid="chat-list-search"] [contenteditable="true"]') ||
+        document.querySelector('div[contenteditable="true"][data-tab="3"]') ||
+        document.querySelector('div[role="textbox"][data-tab="3"]');
+
+      if (searchInput) {
+        searchInput.focus();
+        document.execCommand('selectAll', false, null);
+        document.execCommand('delete', false, null);
+        document.execCommand('insertText', false, searchTerm);
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        await new Promise(r => setTimeout(r, 500));
+
+        const chatRow =
+          document.querySelector('#pane-side [role="row"], #pane-side [role="listitem"], [data-testid="cell-frame-container"]') ||
+          document.querySelector('[data-testid="chat-list"] [role="listitem"]');
+
+        if (chatRow) {
+          chatRow.click();
+          switched = true;
+          await new Promise(r => setTimeout(r, 650));
+          await pasteToChat(fullMsg, true);
+
+          setTimeout(() => {
+            const cancelBtn = document.querySelector('[data-testid="icon-search-morph"], [data-testid="x-alt"], button[aria-label*="Cancel"], button[aria-label*="Clear"]');
+            cancelBtn?.click();
+          }, 350);
+        }
+      }
+    } catch (e) {}
+
+    if (!switched) {
+      const url = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(fullMsg)}`;
+      window.open(url, '_blank');
+    }
+
+    toast(`✓ সেলার ${seller.name}-কে কাজ পাঠানো হয়েছে`);
+    showReturnToCustomerBanner(_returnCustomerChat);
+    return true;
+  }
+
+  function showReturnToCustomerBanner(cust) {
+    if (!cust || (!cust.phone && !cust.name)) return;
+    document.getElementById('ds-return-customer-banner')?.remove();
+    const banner = document.createElement('div');
+    banner.id = 'ds-return-customer-banner';
+    banner.className = 'ds-return-customer-banner';
+    banner.innerHTML = `
+      <span>সেলারকে পাঠানো সম্পন্ন</span>
+      <button class="ds-return-customer-btn" type="button" id="ds-btn-ret-cust">
+        ↩ ${esc(cust.name || 'কাস্টমার')} এর চ্যাটে ফিরুন
+      </button>
+      <button type="button" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:16px;line-height:1;" id="ds-btn-ret-close">×</button>
+    `;
+    document.body.appendChild(banner);
+
+    const remove = () => banner.remove();
+    banner.querySelector('#ds-btn-ret-close').onclick = remove;
+    banner.querySelector('#ds-btn-ret-cust').onclick = async () => {
+      remove();
+      const term = cust.phone || cust.name;
+      const searchInput =
+        document.querySelector('#side [contenteditable="true"]') ||
+        document.querySelector('[data-testid="chat-list-search"]') ||
+        document.querySelector('div[contenteditable="true"][data-tab="3"]');
+      if (searchInput && term) {
+        searchInput.focus();
+        document.execCommand('selectAll', false, null);
+        document.execCommand('delete', false, null);
+        document.execCommand('insertText', false, term);
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 450));
+        const row = document.querySelector('#pane-side [role="row"], #pane-side [role="listitem"]');
+        row?.click();
+        setTimeout(() => {
+          document.querySelector('[data-testid="x-alt"], button[aria-label*="Cancel"]')?.click();
+        }, 300);
+      }
+    };
+
+    setTimeout(() => banner.remove(), 25000);
   }
 
   function openTaskAddModal(panel, c, id, flowKey, canWrite, initialApp = null, onDone = null) {
@@ -1964,6 +2427,24 @@
       <div class="ds-field"><label class="ds-label">বিস্তারিত নোট / ডেটা</label>
         <textarea class="ds-textarea" id="ta-notes" rows="5" style="min-height:100px;"
           placeholder="কাজের বিবরণ, ফাইল তথ্য, নির্দেশনা ইত্যাদি..."></textarea></div>
+
+      <!-- Seller / Vendor Selection with Auto-Send Option -->
+      <div class="ds-field" style="background:var(--surface2);padding:10px 12px;border-radius:10px;border:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label class="ds-label" style="margin:0;font-weight:800;color:var(--text);">🎯 সেলার / ভেন্ডর সিলেক্ট করুন</label>
+          <button class="ds-chip-btn" id="ta-add-seller-btn" type="button" style="font-size:10px;padding:2px 8px;color:#10b981;border-color:rgba(16,185,129,0.3);">+ নতুন সেলার</button>
+        </div>
+        <select class="ds-select" id="ta-seller">
+          <option value="">— সেলার ছাড়া সেভ করুন —</option>
+        </select>
+        <div id="ta-seller-autosend-wrap" style="margin-top:8px;display:none;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:6px;padding:6px 10px;">
+          <label class="ds-checkbox-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11.5px;font-weight:700;color:var(--text);margin:0;">
+            <input type="checkbox" id="ta-autosend-seller" checked style="width:16px;height:16px;margin:0;accent-color:#10b981;">
+            <span>🚀 সেভ করার সাথে সাথে সেলারকে WhatsApp এ পাঠাও</span>
+          </label>
+        </div>
+      </div>
+
       <div id="ta-rename-wrap" class="ds-hidden" style="margin-bottom:10px;">
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;">
           <input type="checkbox" id="ta-cust-rename" checked>
@@ -1978,6 +2459,46 @@
         const pqEl = ov.querySelector('#ta-pq'), psEl = ov.querySelector('#ta-ps');
         const nameEl = ov.querySelector('#ta-name'), amtEl = ov.querySelector('#ta-amt');
         let searchTimer = null;
+
+        // Seller population & selection handlers
+        const sellerSelect = ov.querySelector('#ta-seller');
+        const autoSendWrap = ov.querySelector('#ta-seller-autosend-wrap');
+        const autoSendCheck = ov.querySelector('#ta-autosend-seller');
+        let availableSellers = [];
+
+        const populateSellers = async (selectId = null) => {
+          availableSellers = await fetchSellers();
+          if (!sellerSelect) return;
+          sellerSelect.innerHTML = '<option value="">— সেলার ছাড়া সেভ করুন —</option>' +
+            availableSellers.map(s => `
+              <option value="${s.id}">👤 ${esc(s.name)} (${esc(s.phone)})${s.service_type ? ` • ${esc(s.service_type)}` : ''}</option>
+            `).join('');
+
+          const targetId = selectId || localStorage.getItem('ds_last_seller_id');
+          if (targetId && availableSellers.some(x => String(x.id) === String(targetId))) {
+            sellerSelect.value = String(targetId);
+            autoSendWrap.style.display = 'block';
+            if (autoSendCheck) autoSendCheck.checked = true;
+          }
+        };
+        populateSellers();
+
+        sellerSelect?.addEventListener('change', () => {
+          const sid = sellerSelect.value;
+          if (sid) {
+            autoSendWrap.style.display = 'block';
+            if (autoSendCheck) autoSendCheck.checked = true;
+            localStorage.setItem('ds_last_seller_id', sid);
+          } else {
+            autoSendWrap.style.display = 'none';
+          }
+        });
+
+        ov.querySelector('#ta-add-seller-btn')?.addEventListener('click', () => {
+          openSellerAddModal(async (newSeller) => {
+            await populateSellers(newSeller.id);
+          });
+        });
 
         const applyAppToForm = async (app) => {
           if (!app) return;
@@ -2121,44 +2642,72 @@
         pqEl.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(doSearch, 250); });
         ov.querySelector('#ta-cancel').onclick = close;
         ov.querySelector('#ta-save').onclick = async () => {
+          const saveBtn = ov.querySelector('#ta-save');
           const name = (nameEl.value || '').trim();
           if (!name) { toast('কাজের নাম দিন'); return; }
           const finalAmount = parseAmount(amtEl.value || 0);
-          const res = await apiPost('ajax_task_add', {
-            customer_id: c.id,
-            task_name: name,
-            amount: finalAmount,
-            notes: (ov.querySelector('#ta-notes').value || '').trim(),
-          });
-          if (res.ok) {
-            if (ov.querySelector('#ta-save-custom-rate')?.checked && selProduct.id) {
-              apiPost('ajax_custom_price_save', {
-                customer_id: c.id,
-                product_id: selProduct.id,
-                custom_price: finalAmount,
-              }).catch(() => {});
-            }
-            if (ov.querySelector('#ta-cust-rename')?.checked && currentApp && currentApp.name) {
-              apiPost('ajax_customer_update', {
-                customer_id: c.id,
-                name: currentApp.name,
-              }).catch(() => {});
-            }
-            setWorkflowState(flowKey, {
-              kind: 'info', title: 'কাজ যোগ হয়েছে',
-              meta: 'Pending task',
-              items: [
-                { label: 'কাজ', value: name },
-                { label: 'মূল্য', value: fmt(finalAmount) },
-              ]
+          const finalNotes = (ov.querySelector('#ta-notes')?.value || '').trim();
+
+          const selectedSellerId = sellerSelect?.value ? Number(sellerSelect.value) : null;
+          const selSeller = selectedSellerId ? availableSellers.find(s => Number(s.id) === selectedSellerId) : null;
+          const shouldAutoSend = !!(autoSendCheck?.checked && selSeller);
+
+          if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'সেভ হচ্ছে...'; }
+          try {
+            const res = await apiPost('ajax_task_add', {
+              customer_id: c.id,
+              task_name: name,
+              amount: finalAmount,
+              notes: finalNotes,
+              seller_id: selSeller ? selSeller.id : null,
+              seller_name: selSeller ? selSeller.name : '',
             });
-            if (currentApp && currentApp.appId) {
-              _appIdCache.set(currentApp.appId, { ok: true, exists: true, data: { id: res.task_id, task_name: name } });
+            if (res.ok) {
+              if (selectedSellerId) {
+                localStorage.setItem('ds_last_seller_id', String(selectedSellerId));
+              }
+              if (ov.querySelector('#ta-save-custom-rate')?.checked && selProduct.id) {
+                apiPost('ajax_custom_price_save', {
+                  customer_id: c.id,
+                  product_id: selProduct.id,
+                  custom_price: finalAmount,
+                }).catch(() => {});
+              }
+              if (ov.querySelector('#ta-cust-rename')?.checked && currentApp && currentApp.name) {
+                apiPost('ajax_customer_update', {
+                  customer_id: c.id,
+                  name: currentApp.name,
+                }).catch(() => {});
+              }
+              setWorkflowState(flowKey, {
+                kind: 'info', title: res.updated ? 'কাজ আপডেট হয়েছে' : 'কাজ যোগ হয়েছে',
+                meta: 'Pending task',
+                items: [
+                  { label: 'কাজ', value: name },
+                  { label: 'মূল্য', value: fmt(finalAmount) },
+                  ...(selSeller ? [{ label: 'সেলার', value: selSeller.name }] : [])
+                ]
+              });
+              if (currentApp && currentApp.appId) {
+                _appIdCache.set(currentApp.appId, { ok: true, exists: true, data: { id: res.task_id, task_name: name } });
+              }
+              document.getElementById('ds-app-floating-pill')?.remove();
+              if (typeof onDone === 'function') onDone(res);
+              close();
+              toast(res.updated ? 'কাজ আপডেট হয়েছে' : 'কাজ যোগ হয়েছে');
+              await loadSafe(panel, id);
+
+              if (shouldAutoSend && selSeller) {
+                sendApplicationToSeller(selSeller, name, finalNotes, c);
+              }
+            } else {
+              toast(esc(res.error || 'ব্যর্থ'));
+              if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'সেভ'; }
             }
-            document.getElementById('ds-app-floating-pill')?.remove();
-            if (typeof onDone === 'function') onDone(res);
-            close(); toast('কাজ যোগ হয়েছে'); await loadSafe(panel, id);
-          } else toast(esc(res.error || 'ব্যর্থ'));
+          } catch (err) {
+            toast('অনুরোধ ব্যর্থ হয়েছে');
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'সেভ'; }
+          }
         };
       });
   }
@@ -2331,6 +2880,40 @@
       });
   }
 
+  // ── Floating Launcher Pill ────────────────────────────────────────────────
+  function ensureLauncher() {
+    let launcher = document.getElementById('ds-wa-launcher');
+    if (!launcher) {
+      launcher = document.createElement('div');
+      launcher.id = 'ds-wa-launcher';
+      launcher.title = 'Digital Store CRM খুলুন (Alt+D)';
+      launcher.innerHTML = `
+        <span class="ds-launcher-icon">⚡</span>
+        <span class="ds-launcher-text">CRM</span>
+      `;
+      document.body.appendChild(launcher);
+      launcher.addEventListener('click', () => {
+        _manuallyClosed = false;
+        const p = ensurePanel();
+        p.classList.remove('ds-hidden');
+        syncLauncherVisibility();
+        boot(true);
+      });
+    }
+    return launcher;
+  }
+
+  function syncLauncherVisibility() {
+    const panel = document.getElementById('ds-wa-panel');
+    const launcher = ensureLauncher();
+    const isHidden = !panel || panel.classList.contains('ds-hidden');
+    if (isHidden) {
+      launcher.classList.remove('ds-hidden');
+    } else {
+      launcher.classList.add('ds-hidden');
+    }
+  }
+
   // ── Panel ──────────────────────────────────────────────────────────────────
   function ensurePanel() {
     let panel = document.getElementById('ds-wa-panel');
@@ -2405,7 +2988,8 @@
                 </button>
                 <button class="ds-btn ds-btn-outline" id="ds-due">বাকি তালিকা</button>
                 <button class="ds-btn ds-btn-outline" id="ds-all-tasks">📋 বাকি কাজ</button>
-                <button class="ds-btn ds-btn-outline" id="ds-stat" style="grid-column: span 2;">📊 আজকের রিপোর্ট</button>
+                <button class="ds-btn ds-btn-outline" id="ds-sellers-btn">🎯 সেলার তালিকা</button>
+                <button class="ds-btn ds-btn-outline" id="ds-stat">📊 আজকের রিপোর্ট</button>
               </div>
             </div>
             <div class="ds-card">
@@ -2541,7 +3125,11 @@
           }
         };
       });
-      panel.querySelector('.ds-close').addEventListener('click', () => panel.classList.toggle('ds-hidden'));
+      panel.querySelector('.ds-close').addEventListener('click', () => {
+        _manuallyClosed = true;
+        panel.classList.add('ds-hidden');
+        syncLauncherVisibility();
+      });
       panel.querySelector('#ds-rfr').addEventListener('click', () => {
         const icon = panel.querySelector('#ds-rfr svg');
         if (icon) {
@@ -2645,6 +3233,59 @@
               </div>
             `).join('')}
           </div>`;
+      });
+
+      panel.querySelector('#ds-sellers-btn')?.addEventListener('click', async () => {
+        const out = document.getElementById('ds-tools-output'); if (!out) return;
+        out.innerHTML = '<div class="ds-muted">লোড হচ্ছে...</div>';
+        const renderList = (list) => {
+          out.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 8px;">
+              <div class="ds-subtitle" style="margin:0;">🎯 সেলার তালিকা (${list.length})</div>
+              <button class="ds-chip-btn" id="ds-tools-add-seller" type="button" style="color:#10b981;border-color:rgba(16,185,129,0.3);font-size:10.5px;">+ নতুন সেলার</button>
+            </div>
+            ${!list.length ? '<div class="ds-muted" style="padding:14px 0;">কোনো সেলার সেভ করা নেই।</div>' : `
+              <div class="ds-list">
+                ${list.map(s => `
+                  <div class="ds-list-item" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+                    <div>
+                      <div style="font-weight:800;font-size:12px;">👤 ${esc(s.name)}</div>
+                      <div class="ds-muted" style="font-size:10.5px;">📞 ${esc(s.phone)}${s.service_type ? ` • ${esc(s.service_type)}` : ''}</div>
+                    </div>
+                    <div style="display:flex;gap:4px;align-items:center;">
+                      <a href="https://web.whatsapp.com/send?phone=${normalizePhone(s.phone)}" target="_blank" class="ds-chip-btn" style="color:#25d366;font-size:10px;text-decoration:none;" title="WhatsApp এ মেসেজ">💬 চ্যাট</a>
+                      <button class="ds-chip-btn ds-del-seller-btn" data-id="${s.id}" type="button" style="color:#ef4444;font-size:10px;" title="সেলার মুছুন">🗑️</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          `;
+          out.querySelector('#ds-tools-add-seller')?.addEventListener('click', () => {
+            openSellerAddModal(async () => {
+              const updated = await fetchSellers(true);
+              renderList(updated);
+            });
+          });
+          out.querySelectorAll('.ds-del-seller-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const sid = btn.dataset.id;
+              if (!confirm('এই সেলার কি মুছে ফেলতে চান?')) return;
+              btn.disabled = true;
+              const res = await apiPost('ajax_sellers', { action: 'delete', id: sid });
+              if (res.ok) {
+                toast('সেলার মুছে ফেলা হয়েছে');
+                const updated = await fetchSellers(true);
+                renderList(updated);
+              } else {
+                toast(esc(res.error || 'ব্যর্থ'));
+                btn.disabled = false;
+              }
+            });
+          });
+        };
+        const sellers = await fetchSellers(true);
+        renderList(sellers);
       });
 
       panel.querySelector('#ds-due')?.addEventListener('click', async () => {
@@ -3014,6 +3655,7 @@
   async function boot(forceRefresh = false) {
     const panel = ensurePanel();
     panel.classList.remove('ds-hidden');
+    syncLauncherVisibility();
     initComposerInterceptor();
     await refreshToolsOverview(panel, forceRefresh);
     refreshBadgesCache();
@@ -3042,6 +3684,22 @@
     if (booted) return;
     booted = true;
 
+    // Fast click listener: whenever user clicks any chat row in left sidebar or search, auto-open panel!
+    document.addEventListener('click', (e) => {
+      const chatRow = e.target?.closest?.(
+        '#pane-side [role="row"], #pane-side [role="listitem"], #pane-side [data-testid="cell-frame-container"], #pane-side div[tabindex], [data-testid="chat-list"] [role="listitem"], [data-testid="chat-list"] [role="row"], [data-testid="chat-list-search"] [role="listitem"], [data-testid="chat-list-search"] [role="row"]'
+      );
+      if (chatRow) {
+        _manuallyClosed = false;
+        panel.classList.remove('ds-hidden');
+        syncLauncherVisibility();
+        setTimeout(check, 60);
+        setTimeout(check, 250);
+        setTimeout(check, 700);
+        setTimeout(check, 1400);
+      }
+    }, true);
+
     const check = async () => {
       applyChatBadges();
       updateChatFloatingReminder();
@@ -3049,6 +3707,18 @@
       const k2 = id2 ? id2.key : '__none__';
       const chatMeta2 = getSelectedChatMeta();
       const chatSignal2 = `${k2}|${chatMeta2.unreadCount}|${chatMeta2.muted ? 1 : 0}|${id2?.name || ''}`;
+
+      // Reset manual close if chat changed!
+      if (_lastKey !== k2 && k2 !== '__none__') {
+        _manuallyClosed = false;
+      }
+
+      // If active contact detected in WhatsApp, ensure panel is open unless explicitly closed for THIS chat!
+      if (id2 && !_manuallyClosed) {
+        panel.classList.remove('ds-hidden');
+        syncLauncherVisibility();
+      }
+
       if (_lastKey === k2 && _lastChatSignal === chatSignal2) return;
       _lastKey = k2;
       _lastChatSignal = chatSignal2;
@@ -3057,44 +3727,62 @@
           : '<div class="ds-empty"><div class="ds-empty-icon">💬</div>একটি চ্যাট ওপেন করুন</div>';
       panel.querySelector('#ds-actions').innerHTML = '';
       panel.querySelector('#ds-recent').innerHTML = '';
-      if (id2) { await loadSafe(panel, id2); panel.classList.remove('ds-hidden'); }
+      if (id2) {
+        await loadSafe(panel, id2);
+      }
     };
 
-    const debounced = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(check, 350); };
+    const debounced = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(check, 250); };
 
-    observer = new MutationObserver(debounced);
-    const targets = [
-      document.querySelector('#main'),
-      document.querySelector('#pane-side'),
-      document.querySelector('[data-testid="contact-info-drawer"]'),
-      document.querySelector('[data-testid="drawer-right"]'),
-      document.querySelector('#app')
-    ].filter(Boolean);
-    if (targets.length) {
-      targets.forEach(t => observer.observe(t, {
-        subtree: true, childList: true, attributes: true,
-        attributeFilter: ['aria-selected', 'data-id', 'data-jid', 'aria-label', 'title']
-      }));
-    } else {
-      observer.observe(document.body, {
-        subtree: true, childList: true, attributes: true,
-        attributeFilter: ['aria-selected', 'data-id', 'data-jid', 'class', 'aria-label', 'title']
-      });
-    }
-    pollTimer = setInterval(check, 1500);
+    let _observerHasPane = false;
+    const attachObserver = () => {
+      if (observer) {
+        try { observer.disconnect(); } catch (e) {}
+      }
+      observer = new MutationObserver(debounced);
+      const targets = [
+        document.querySelector('#main'),
+        document.querySelector('#pane-side'),
+        document.querySelector('[data-testid="contact-info-drawer"]'),
+        document.querySelector('[data-testid="drawer-right"]'),
+        document.querySelector('#app')
+      ].filter(Boolean);
+      if (targets.length) {
+        targets.forEach(t => observer.observe(t, {
+          subtree: true, childList: true, attributes: true,
+          attributeFilter: ['aria-selected', 'data-id', 'data-jid', 'aria-label', 'title', 'class']
+        }));
+      } else {
+        observer.observe(document.body, {
+          subtree: true, childList: true, attributes: true,
+          attributeFilter: ['aria-selected', 'data-id', 'data-jid', 'class', 'aria-label', 'title']
+        });
+      }
+    };
+
+    attachObserver();
+    // Periodically re-attach observer if WhatsApp DOM changes structure
+    setInterval(() => {
+      const pane = document.querySelector('#pane-side');
+      if (pane && !_observerHasPane) {
+        _observerHasPane = true;
+        attachObserver();
+      }
+    }, 5000);
+
+    pollTimer = setInterval(check, 800);
   }
 
   // Global Keyboard Shortcut: Alt+D toggles panel
   window.addEventListener('keydown', (e) => {
     if (e.altKey && (e.key === 'd' || e.key === 'D' || e.code === 'KeyD')) {
       e.preventDefault();
-      const panel = document.getElementById('ds-wa-panel');
-      if (panel) {
-        panel.classList.toggle('ds-hidden');
-        if (!panel.classList.contains('ds-hidden')) boot(true);
-      } else {
-        boot(true);
-      }
+      const panel = ensurePanel();
+      const willOpen = panel.classList.contains('ds-hidden');
+      _manuallyClosed = !willOpen;
+      panel.classList.toggle('ds-hidden');
+      syncLauncherVisibility();
+      if (willOpen) boot(true);
     }
   });
 

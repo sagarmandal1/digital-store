@@ -85,6 +85,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'delete') {
     }
 
     try {
+        app_ensure_customer_tasks_table();
+        $stmtTask = $pdo->prepare('UPDATE customer_tasks SET status = "pending", sale_id = NULL, delivered_at = NULL WHERE sale_id = :id AND admin_id = :aid');
+        $stmtTask->execute([':id' => $saleId, ':aid' => $adminId]);
+
         $stmt = $pdo->prepare('DELETE FROM sales WHERE id = :id AND admin_id = :aid');
         $stmt->execute([':id' => $saleId, ':aid' => $adminId]);
         
