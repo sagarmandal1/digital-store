@@ -317,8 +317,11 @@ function app_extract_office_info(string $address): array
 {
     $address = trim($address);
     if ($address === '') {
-        return ['name' => 'Default', 'city_corp' => '', 'zone' => '', 'area' => ''];
+        return ['name' => 'Default', 'city_corp' => '', 'short_cc' => '', 'zone' => '', 'zone_label' => '', 'zone_num' => null, 'area' => '', 'keys' => []];
     }
+
+    $bnToEn = ['০' => '0', '১' => '1', '২' => '2', '৩' => '3', '৪' => '4', '৫' => '5', '৬' => '6', '৭' => '7', '৮' => '8', '৯' => '9'];
+    $enToBn = array_flip($bnToEn);
 
     $cityCorps = [
         'ঢাকা উত্তর সিটি কর্পোরেশন',
@@ -350,11 +353,21 @@ function app_extract_office_info(string $address): array
         }
     }
 
-    $zone = '';
-    if (preg_match('/(অঞ্চল\s*[-–:]?\s*[০-৯0-9]+)/u', $address, $zm)) {
-        $zone = preg_replace('/\s+/', '', $zm[1]);
+    $shortCc = '';
+    if ($matchedCc !== '') {
+        $shortCc = str_replace(' সিটি কর্পোরেশন', '', $matchedCc);
     }
 
+    // Extract Zone / অঞ্চল
+    $zoneNum = null;
+    $zoneBn = '';
+    if (preg_match('/(?:অঞ্চল|zone)\s*[-–:]?\s*([০-৯0-9]+)/iu', $address, $zm)) {
+        $rawNum = strtr($zm[1], $bnToEn);
+        $zoneNum = (int)$rawNum;
+        $zoneBn = 'অঞ্চল ' . strtr((string)$zoneNum, $enToBn);
+    }
+
+    // Extract common Area
     $area = '';
     $areaKeywords = ['বাসাবো', 'বাড্ডা', 'আফতাব নগর', 'সবুজবাগ', 'মিরপুর', 'উত্তরা', 'মোহাম্মদপুর', 'গুলশান', 'ধানমন্ডি', 'যাত্রাবাড়ী', 'মতিঝিল', 'খিলগাঁও', 'রামপুরা', 'বনশ্রী'];
     foreach ($areaKeywords as $ak) {
@@ -364,43 +377,70 @@ function app_extract_office_info(string $address): array
         }
     }
 
+    $zoneLabel = '';
+    $keys = [];
+    if ($zoneNum !== null) {
+        $zHyphen = 'অঞ্চল-' . strtr((string)$zoneNum, $enToBn);
+        $zoneLabel = ($shortCc !== '' ? $shortCc . ' - ' : '') . $zoneBn;
+        if ($shortCc !== '') {
+            $keys[] = $shortCc . ' - ' . $zoneBn;
+            $keys[] = $shortCc . ' - ' . $zHyphen;
+            $keys[] = $matchedCc . ' (' . $zHyphen . ')';
+            $keys[] = $matchedCc . ' (' . $zoneBn . ')';
+        }
+        $keys[] = $zoneBn;
+        $keys[] = $zHyphen;
+        $keys[] = 'Zone ' . $zoneNum;
+    }
+
+    $fullName = $zoneLabel !== '' ? $zoneLabel : ($matchedCc !== '' ? $matchedCc : '');
+    if ($area !== '' && !str_contains($fullName, $area)) {
+        $fullName .= ($fullName !== '' ? ' (' . $area . ')' : $area);
+    }
+
+    if ($fullName === '') {
+        $districts = ['বান্দরবান', 'কক্সবাজার', 'চট্টগ্রাম', 'সিলেট', 'ব্রাহ্মণবাড়িয়া', 'নোয়াখালী', 'কুমিল্লা', 'ময়মনসিংহ', 'রংপুর', 'রাজশাহী', 'খুলনা', 'বরিশাল'];
+        foreach ($districts as $d) {
+            if (str_contains($address, $d)) {
+                $fullName = $d;
+                $keys[] = $d;
+                break;
+            }
+        }
+    }
+
+    if ($fullName === '') {
+        if (str_contains($address, 'পৌরসভা')) {
+            $fullName = 'পৌরসভা';
+            $keys[] = 'পৌরসভা';
+        } elseif (str_contains($address, 'ইউনিয়ন')) {
+            $fullName = 'ইউনিয়ন পরিষদ';
+            $keys[] = 'ইউনিয়ন পরিষদ';
+        } else {
+            $fullName = substr($address, 0, 40);
+        }
+    }
+
     if ($matchedCc !== '') {
-        $sub = [];
-        if ($zone !== '') {
-            $sub[] = $zone;
-        }
-        if ($area !== '') {
-            $sub[] = $area;
-        }
-        $fullName = $matchedCc . ($sub ? ' (' . implode(', ', $sub) . ')' : '');
-        return [
-            'name' => $fullName,
-            'city_corp' => $matchedCc,
-            'zone' => $zone,
-            'area' => $area,
-        ];
-    }
-
-    $districts = ['বান্দরবান', 'কক্সবাজার', 'চট্টগ্রাম', 'সিলেট', 'ব্রাহ্মণবাড়িয়া', 'নোয়াখালী', 'কুমিল্লা', 'ময়মনসিংহ', 'রংপুর', 'রাজশাহী', 'খুলনা', 'বরিশাল'];
-    foreach ($districts as $d) {
-        if (str_contains($address, $d)) {
-            return [
-                'name' => $d,
-                'city_corp' => '',
-                'zone' => '',
-                'area' => $d,
-            ];
+        $keys[] = $matchedCc;
+        if ($shortCc !== '') {
+            $keys[] = $shortCc;
         }
     }
-
-    if (str_contains($address, 'পৌরসভা')) {
-        return ['name' => 'পৌরসভা', 'city_corp' => '', 'zone' => '', 'area' => ''];
-    }
-    if (str_contains($address, 'ইউনিয়ন')) {
-        return ['name' => 'ইউনিয়ন পরিষদ', 'city_corp' => '', 'zone' => '', 'area' => ''];
+    if ($area !== '') {
+        $keys[] = $area;
     }
 
-    return ['name' => substr($address, 0, 40), 'city_corp' => '', 'zone' => '', 'area' => ''];
+    return [
+        'name' => $fullName,
+        'city_corp' => $matchedCc,
+        'short_cc' => $shortCc,
+        'zone' => $zoneBn,
+        'zone_num' => $zoneNum,
+        'zone_label' => $zoneLabel !== '' ? $zoneLabel : $fullName,
+        'area' => $area,
+        'keys' => array_values(array_unique($keys)),
+    ];
 }
 
 /**

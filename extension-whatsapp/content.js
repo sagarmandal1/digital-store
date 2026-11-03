@@ -2022,8 +2022,9 @@
               amtEl.value = String(sRes.suggested_rate);
               const hintEl = ov.querySelector('#ta-rate-hint');
               if (hintEl) {
+                const zoneBadge = sRes.zone_label ? `<span style="background:rgba(37,211,102,0.18);padding:1px 6px;border-radius:4px;font-weight:700;">📍 ${esc(sRes.zone_label)}</span> ` : '';
                 const label = sRes.reason ? esc(sRes.reason) : esc(sRes.office_name || '');
-                hintEl.innerHTML = `💡 অটো-সাজেস্ট রেট: <b>৳${sRes.suggested_rate}</b> (${label})`;
+                hintEl.innerHTML = `💡 অটো-সাজেস্ট রেট: <b>৳${sRes.suggested_rate}</b> • ${zoneBadge}(${label})`;
                 hintEl.style.display = 'block';
               }
             } else {
@@ -2074,7 +2075,7 @@
             amtEl.value = r;
             const hintEl = ov.querySelector('#ta-rate-hint');
             if (hintEl) {
-              hintEl.innerHTML = `রেট সিলেক্ট করা হয়েছে: <b>৳${r}</b> (সেভ করলে এই অফিসের জন্য মনে রাখা হবে)`;
+              hintEl.innerHTML = `রেট সিলেক্ট করা হয়েছে: <b>৳${r}</b> (সেভ করলে এই জোনের জন্য মনে রাখা হবে)`;
               hintEl.style.display = 'block';
             }
           });
@@ -2083,7 +2084,7 @@
         amtEl.addEventListener('input', () => {
           const hintEl = ov.querySelector('#ta-rate-hint');
           if (hintEl && amtEl.value) {
-            hintEl.innerHTML = `রেট এডিট করা হয়েছে: <b>৳${amtEl.value}</b> (সেভ করলে এই অফিসের জন্য মনে রাখা হবে)`;
+            hintEl.innerHTML = `রেট এডিট করা হয়েছে: <b>৳${amtEl.value}</b> (সেভ করলে এই জোনের জন্য মনে রাখা হবে)`;
             hintEl.style.display = 'block';
           }
         });

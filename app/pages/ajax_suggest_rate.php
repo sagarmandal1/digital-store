@@ -22,103 +22,95 @@ $address = trim((string)($_GET['address'] ?? $_GET['office_address'] ?? ''));
 $officeInfo = app_extract_office_info($address);
 $fullName = $officeInfo['name'];
 $cityCorp = $officeInfo['city_corp'];
+$zone = $officeInfo['zone'];
+$zoneLabel = $officeInfo['zone_label'];
 $area = $officeInfo['area'];
+$keys = $officeInfo['keys'] ?? [];
 
 $suggestedRate = 0.0;
 $matchType = 'none';
 $reason = '';
 
 try {
-    // 1. Check customer_office_rates for THIS customer
-    if ($customerId > 0 && $ownerId > 0) {
-        $stmt = db()->prepare('
+    // 1. Check customer_office_rates for THIS customer (Zone-first matching)
+    if ($customerId > 0 && $ownerId > 0 && !empty($keys)) {
+        $inClause = implode(',', array_fill(0, count($keys), '?'));
+        $stmt = db()->prepare("
             SELECT rate, office_name FROM customer_office_rates
-            WHERE customer_id = :cid AND admin_id = :aid
-              AND (office_name = :full OR office_name = :cc OR office_name = :area)
-            ORDER BY (CASE WHEN office_name = :full THEN 1 WHEN office_name = :cc THEN 2 ELSE 3 END), updated_at DESC
-            LIMIT 1
-        ');
-        $stmt->execute([
-            ':cid' => $customerId,
-            ':aid' => $ownerId,
-            ':full' => $fullName,
-            ':cc' => $cityCorp,
-            ':area' => $area,
-        ]);
-        $row = $stmt->fetch();
-        if ($row && to_float($row['rate']) > 0) {
-            $suggestedRate = to_float($row['rate']);
-            $matchType = 'customer_office';
-            $reason = 'এই কাস্টমারের পূর্বের রেট: ' . $row['office_name'];
+            WHERE customer_id = ? AND admin_id = ? AND office_name IN ($inClause)
+            ORDER BY updated_at DESC
+        ");
+        $stmt->execute(array_merge([$customerId, $ownerId], $keys));
+        $allRows = $stmt->fetchAll() ?: [];
+        foreach ($keys as $k) {
+            foreach ($allRows as $r) {
+                if ($r['office_name'] === $k && to_float($r['rate']) > 0) {
+                    $suggestedRate = to_float($r['rate']);
+                    $matchType = 'customer_zone';
+                    $reason = 'এই কাস্টমারের পূর্বের রেট: ' . $r['office_name'];
+                    break 2;
+                }
+            }
         }
     }
 
-    // 2. Check customer_tasks for THIS customer
-    if ($suggestedRate <= 0 && $customerId > 0) {
-        $targets = array_unique(array_filter([$cityCorp, $area, $fullName]));
-        foreach ($targets as $tgt) {
-            if ($tgt === '') {
-                continue;
-            }
+    // 2. Check customer_tasks history for THIS customer (Zone-first)
+    if ($suggestedRate <= 0 && $customerId > 0 && !empty($keys)) {
+        foreach ($keys as $k) {
             $stmt = db()->prepare('
                 SELECT amount FROM customer_tasks
                 WHERE customer_id = :cid AND (admin_id = :aid OR :aid = 0)
                   AND notes LIKE :tgt
                 ORDER BY id DESC LIMIT 1
             ');
-            $stmt->execute([':cid' => $customerId, ':aid' => $ownerId, ':tgt' => '%' . $tgt . '%']);
+            $stmt->execute([':cid' => $customerId, ':aid' => $ownerId, ':tgt' => '%' . $k . '%']);
             $amt = to_float($stmt->fetchColumn() ?: 0);
             if ($amt > 0) {
                 $suggestedRate = $amt;
                 $matchType = 'customer_history';
-                $reason = 'এই কাস্টমারের পূর্বের কাজের রেট: ' . $tgt;
+                $reason = 'এই কাস্টমারের পূর্বের কাজের রেট: ' . $k;
                 break;
             }
         }
     }
 
-    // 3. Check customer_office_rates for ANY customer in this store
-    if ($suggestedRate <= 0 && $ownerId > 0) {
-        $stmt = db()->prepare('
+    // 3. Check customer_office_rates for ANY customer in this store (Zone-first)
+    if ($suggestedRate <= 0 && $ownerId > 0 && !empty($keys)) {
+        $inClause = implode(',', array_fill(0, count($keys), '?'));
+        $stmt = db()->prepare("
             SELECT rate, office_name FROM customer_office_rates
-            WHERE admin_id = :aid
-              AND (office_name = :full OR office_name = :cc OR office_name = :area)
-            ORDER BY (CASE WHEN office_name = :full THEN 1 WHEN office_name = :cc THEN 2 ELSE 3 END), updated_at DESC
-            LIMIT 1
-        ');
-        $stmt->execute([
-            ':aid' => $ownerId,
-            ':full' => $fullName,
-            ':cc' => $cityCorp,
-            ':area' => $area,
-        ]);
-        $row = $stmt->fetch();
-        if ($row && to_float($row['rate']) > 0) {
-            $suggestedRate = to_float($row['rate']);
-            $matchType = 'store_office';
-            $reason = 'অফিসের সাধারণ রেট: ' . $row['office_name'];
+            WHERE admin_id = ? AND office_name IN ($inClause)
+            ORDER BY updated_at DESC
+        ");
+        $stmt->execute(array_merge([$ownerId], $keys));
+        $allRows = $stmt->fetchAll() ?: [];
+        foreach ($keys as $k) {
+            foreach ($allRows as $r) {
+                if ($r['office_name'] === $k && to_float($r['rate']) > 0) {
+                    $suggestedRate = to_float($r['rate']);
+                    $matchType = 'store_zone';
+                    $reason = 'এই জোনের সাধারণ রেট: ' . $r['office_name'];
+                    break 2;
+                }
+            }
         }
     }
 
-    // 4. Check customer_tasks for ANY customer in this store
-    if ($suggestedRate <= 0) {
-        $targets = array_unique(array_filter([$cityCorp, $area]));
-        foreach ($targets as $tgt) {
-            if ($tgt === '') {
-                continue;
-            }
+    // 4. Check customer_tasks for ANY customer in this store (Zone-first)
+    if ($suggestedRate <= 0 && !empty($keys)) {
+        foreach ($keys as $k) {
             $stmt = db()->prepare('
                 SELECT amount FROM customer_tasks
                 WHERE (admin_id = :aid OR :aid = 0)
                   AND notes LIKE :tgt
                 ORDER BY id DESC LIMIT 1
             ');
-            $stmt->execute([':aid' => $ownerId, ':tgt' => '%' . $tgt . '%']);
+            $stmt->execute([':aid' => $ownerId, ':tgt' => '%' . $k . '%']);
             $amt = to_float($stmt->fetchColumn() ?: 0);
             if ($amt > 0) {
                 $suggestedRate = $amt;
                 $matchType = 'store_history';
-                $reason = 'এই অফিসের সর্বশেষ রেট: ' . $tgt;
+                $reason = 'এই জোনের পূর্বের কাজের রেট: ' . $k;
                 break;
             }
         }
@@ -142,6 +134,8 @@ try {
         'ok' => true,
         'suggested_rate' => $suggestedRate,
         'office_name' => $fullName,
+        'zone' => $zone,
+        'zone_label' => $zoneLabel,
         'city_corp' => $cityCorp,
         'area' => $area,
         'match_type' => $matchType,

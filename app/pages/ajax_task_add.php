@@ -59,7 +59,12 @@ try {
     if ($amount > 0 && $notes !== '') {
         try {
             $officeInfo = app_extract_office_info($notes);
-            $namesToSave = array_unique(array_filter([$officeInfo['name'] ?? '', $officeInfo['city_corp'] ?? '']));
+            $namesToSave = array_unique(array_filter([
+                $officeInfo['zone_label'] ?? '',
+                $officeInfo['zone'] ?? '',
+                $officeInfo['name'] ?? '',
+                $officeInfo['city_corp'] ?? '',
+            ]));
             if (!empty($namesToSave) && ($officeInfo['name'] ?? '') !== 'Default') {
                 $stmtRate = db()->prepare('
                     INSERT INTO customer_office_rates (customer_id, admin_id, office_name, rate, updated_at)
