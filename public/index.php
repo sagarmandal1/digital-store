@@ -72,6 +72,7 @@ $allowed = [
     'ajax_task_deliver' => 'ajax_task_deliver.php',
     'ajax_task_update' => 'ajax_task_update.php',
     'ajax_custom_price_save' => 'ajax_custom_price_save.php',
+    'ajax_check_application_id' => 'ajax_check_application_id.php',
     'ajax_quick_templates' => 'ajax_quick_templates.php',
 ];
 

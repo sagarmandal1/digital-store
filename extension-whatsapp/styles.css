@@ -17,6 +17,12 @@
   box-sizing: border-box !important;
 }
 
+@keyframes dsPulse {
+  0% { transform: scale(1); box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35); }
+  50% { transform: scale(1.01); box-shadow: 0 6px 20px rgba(239, 68, 68, 0.55); }
+  100% { transform: scale(1); box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35); }
+}
+
 .ds-chat-badge-due {
   background: #ffe4e6 !important;
   color: #e11d48 !important;

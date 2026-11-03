@@ -460,6 +460,22 @@
     return null;
   }
 
+  const _appIdCache = new Map();
+  async function checkApplicationStatus(appId) {
+    if (!appId) return { exists: false };
+    const clean = String(appId).replace(/[^A-Za-z0-9\-]/g, '');
+    if (clean.length < 3) return { exists: false };
+    if (_appIdCache.has(clean)) return _appIdCache.get(clean);
+    try {
+      const res = await apiGet('ajax_check_application_id', { app_id: clean });
+      const info = (res && res.ok) ? res : { exists: false };
+      _appIdCache.set(clean, info);
+      return info;
+    } catch {
+      return { exists: false };
+    }
+  }
+
   function shortDate(value) {
     const raw = String(value || '').trim();
     if (!raw) return '--';
@@ -861,23 +877,48 @@
     const cfg = await getConfig();
     const writeHint = canWrite ? '' : '<div class="ds-soft-banner">Read-only scope active. Actions বন্ধ আছে।</div>';
     const detectedApp = detectChatApplication();
-    const appBannerHtml = detectedApp ? `
-      <div class="ds-soft-banner" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.35);margin-bottom:8px;padding:8px 10px;border-radius:10px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;">
-          <span style="font-size:11px;font-weight:800;color:#10b981;">⚡ চ্যাটে আবেদন ডিটেক্ট হয়েছে!</span>
-          ${detectedApp.appId ? `<span style="font-size:10px;background:rgba(16,185,129,0.15);color:#059669;padding:1px 6px;border-radius:4px;font-weight:700;">ID: ${esc(detectedApp.appId)}</span>` : ''}
-        </div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);">${esc(detectedApp.name || 'জন্ম নিবন্ধন আবেদন')}</div>
-        ${detectedApp.dob ? `<div style="font-size:10.5px;color:var(--text2);margin-top:2px;">জন্ম তারিখ: <b>${esc(detectedApp.dob)}</b></div>` : ''}
-        <div style="display:flex;gap:6px;margin-top:8px;">
-          <button class="ds-btn ds-btn-primary ds-btn-sm" id="ds-detected-add" type="button" style="flex:1;" ${canWrite ? '' : 'disabled'}>
-            ⚡ ১-ক্লিকে কাজ যোগ
-          </button>
-          <button class="ds-btn ds-btn-outline ds-btn-sm" id="ds-detected-open" type="button" style="flex:1;" ${canWrite ? '' : 'disabled'}>
-            মডালে এডিট
-          </button>
-        </div>
-      </div>` : '';
+    let appStatus = { exists: false };
+    if (detectedApp?.appId) {
+      appStatus = await checkApplicationStatus(detectedApp.appId);
+    }
+
+    let appBannerHtml = '';
+    if (detectedApp) {
+      if (appStatus && appStatus.exists) {
+        appBannerHtml = `
+          <div class="ds-soft-banner" style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);margin-bottom:8px;padding:8px 10px;border-radius:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+              <span style="font-size:11px;font-weight:700;color:#10b981;display:flex;align-items:center;gap:4px;">
+                ✓ আবেদনটি সিস্টেমে এন্ট্রি আছে
+              </span>
+              <span style="font-size:10px;background:rgba(16,185,129,0.12);color:#059669;padding:1px 6px;border-radius:4px;font-weight:700;">ID: ${esc(detectedApp.appId)}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px;">
+              ${esc(detectedApp.name || '')}${appStatus.data ? ` (${appStatus.type === 'task' ? `কাজ #${appStatus.data.id}` : `ইনভয়েস ${appStatus.data.invoice_no}`})` : ''}
+            </div>
+          </div>`;
+      } else {
+        appBannerHtml = `
+          <div class="ds-soft-banner" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.38);margin-bottom:8px;padding:8px 10px;border-radius:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:800;color:#ef4444;display:flex;align-items:center;gap:4px;">
+                🚨 নতুন আবেদন — এন্ট্রি করা হয়নি!
+              </span>
+              ${detectedApp.appId ? `<span style="font-size:10px;background:rgba(239,68,68,0.18);color:#dc2626;padding:1px 6px;border-radius:4px;font-weight:800;">ID: ${esc(detectedApp.appId)}</span>` : ''}
+            </div>
+            <div style="font-size:12px;font-weight:700;color:var(--text);">${esc(detectedApp.name || 'জন্ম নিবন্ধন আবেদন')}</div>
+            ${detectedApp.dob ? `<div style="font-size:10.5px;color:var(--text2);margin-top:2px;">জন্ম তারিখ: <b>${esc(detectedApp.dob)}</b></div>` : ''}
+            <div style="display:flex;gap:6px;margin-top:8px;">
+              <button class="ds-btn ds-btn-primary ds-btn-sm" id="ds-detected-add" type="button" style="flex:1;" ${canWrite ? '' : 'disabled'}>
+                ⚡ এখনই কাজ যোগ করুন
+              </button>
+              <button class="ds-btn ds-btn-outline ds-btn-sm" id="ds-detected-open" type="button" style="flex:1;" ${canWrite ? '' : 'disabled'}>
+                মডালে এডিট
+              </button>
+            </div>
+          </div>`;
+      }
+    }
 
     aEl.innerHTML = `
       <div id="ds-flow-state-wrap">${workflowHtml(flowState)}</div>
@@ -1780,7 +1821,7 @@
       </div>`;
   }
 
-  function openTaskAddModal(panel, c, id, flowKey, canWrite, initialApp = null) {
+  function openTaskAddModal(panel, c, id, flowKey, canWrite, initialApp = null, onDone = null) {
     let selProduct = { id: null, name: '', price: 0 };
     let currentApp = initialApp;
 
@@ -1959,6 +2000,11 @@
                 { label: 'মূল্য', value: fmt(finalAmount) },
               ]
             });
+            if (currentApp && currentApp.appId) {
+              _appIdCache.set(currentApp.appId, { ok: true, exists: true, data: { id: res.task_id, task_name: name } });
+            }
+            document.getElementById('ds-app-floating-pill')?.remove();
+            if (typeof onDone === 'function') onDone(res);
             close(); toast('কাজ যোগ হয়েছে'); await loadSafe(panel, id);
           } else toast(esc(res.error || 'ব্যর্থ'));
         };
@@ -2623,10 +2669,200 @@
     } catch (e) {}
   }
 
+  // ── Application ID Enforcement & Reminder ─────────────────────────────────
+  let _bypassSendAppId = null;
+  let _interceptorBound = false;
+
+  function promptMandatoryTaskAdd(parsed, onDone) {
+    modal('⚠️ বাধ্যতামূলক কাজ এন্ট্রি', `
+      <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.4);padding:10px 12px;border-radius:10px;margin-bottom:12px;">
+        <div style="color:#ef4444;font-weight:800;font-size:12px;display:flex;align-items:center;gap:6px;">
+          🚨 সতর্কতা: এই আবেদনটি সিস্টেমে যোগ করা হয়নি!
+        </div>
+        <div style="font-size:11.5px;color:var(--text);margin-top:4px;">
+          মেসেজ পাঠানোর আগে কাজটি <b>ডিজিটাল স্টোরে</b> যোগ করে নিন, যেন হিসাব ভুলে যাওয়ার ঝুঁকি না থাকে।
+        </div>
+        <div style="margin-top:6px;font-size:11px;color:var(--text2);">
+          <b>Application ID:</b> ${esc(parsed.appId)} • <b>নাম:</b> ${esc(parsed.name || '—')}
+        </div>
+      </div>
+      <div class="ds-modal-actions" style="flex-direction:column;gap:8px;">
+        <button class="ds-btn ds-btn-primary ds-btn-block" id="pma-add" type="button" style="font-size:12.5px;padding:9px;">
+          ⚡ এখনই কাজ যোগ করুন ও মেসেজ পাঠান
+        </button>
+        <button class="ds-btn ds-btn-secondary ds-btn-block" id="pma-skip" type="button" style="font-size:11px;opacity:0.8;">
+          এন্ট্রি ছাড়াই মেসেজ পাঠিয়ে দিন
+        </button>
+      </div>`,
+      (ov, close) => {
+        ov.querySelector('#pma-skip').onclick = () => {
+          close();
+          if (onDone) onDone();
+        };
+        ov.querySelector('#pma-add').onclick = async () => {
+          close();
+          const panel = ensurePanel();
+          const identity = await getIdentity();
+          openTaskAddModal(panel, _currentCustomer || { id: 0, name: parsed.name }, identity, '', true, parsed, () => {
+            _appIdCache.set(parsed.appId, { ok: true, exists: true });
+            document.getElementById('ds-app-floating-pill')?.remove();
+            if (onDone) onDone();
+          });
+        };
+      }
+    );
+  }
+
+  async function updateChatFloatingReminder() {
+    const footer = document.querySelector('#main footer');
+    if (!footer) {
+      document.getElementById('ds-app-floating-pill')?.remove();
+      return;
+    }
+
+    const detected = detectChatApplication();
+    let pill = document.getElementById('ds-app-floating-pill');
+
+    if (!detected || !detected.appId) {
+      if (pill) pill.remove();
+      return;
+    }
+
+    const st = await checkApplicationStatus(detected.appId);
+    if (st && st.exists) {
+      if (pill) pill.remove();
+      return;
+    }
+
+    if (!pill) {
+      pill = document.createElement('div');
+      pill.id = 'ds-app-floating-pill';
+      pill.style.cssText = `
+        position: absolute;
+        top: -44px;
+        left: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 6px 14px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+        z-index: 99;
+      `;
+      footer.style.position = 'relative';
+      footer.appendChild(pill);
+    }
+
+    pill.innerHTML = `
+      <div style="display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        <span>🚨 নতুন আবেদন এন্ট্রি করা হয়নি: <b>ID ${esc(detected.appId)}</b> (${esc(detected.name || 'New Birth')})</span>
+      </div>
+      <button type="button" id="ds-pill-add-btn" style="
+        background: #ffffff;
+        color: #dc2626;
+        border: none;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-weight: 800;
+        font-size: 11px;
+        cursor: pointer;
+        white-space: nowrap;
+      ">⚡ কাজ যোগ করুন</button>
+    `;
+
+    pill.querySelector('#ds-pill-add-btn')?.addEventListener('click', async () => {
+      const panel = ensurePanel();
+      const identity = await getIdentity();
+      openTaskAddModal(panel, _currentCustomer || { id: 0, name: detected.name }, identity, '', true, detected, () => {
+        _appIdCache.set(detected.appId, { ok: true, exists: true });
+        pill?.remove();
+      });
+    });
+  }
+
+  function initComposerInterceptor() {
+    if (_interceptorBound) return;
+    _interceptorBound = true;
+
+    document.addEventListener('keydown', async (e) => {
+      if (e.key !== 'Enter' || e.shiftKey) return;
+      const composer = e.target?.closest?.('#main footer [contenteditable="true"]');
+      if (!composer) return;
+
+      const text = (composer.innerText || composer.textContent || '').trim();
+      const parsed = parseApplicationText(text);
+      if (!parsed || !parsed.appId) return;
+
+      if (_bypassSendAppId === parsed.appId) {
+        _bypassSendAppId = null;
+        return;
+      }
+
+      const status = await checkApplicationStatus(parsed.appId);
+      if (status && status.exists) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      promptMandatoryTaskAdd(parsed, () => {
+        _bypassSendAppId = parsed.appId;
+        setTimeout(() => {
+          const sendBtn =
+            document.querySelector('button span[data-icon="send"]')?.closest('button') ||
+            document.querySelector('[data-testid="compose-btn-send"]') ||
+            document.querySelector('[data-testid="send"]') ||
+            document.querySelector('#main footer button[aria-label*="Send"]');
+          if (sendBtn) sendBtn.click();
+        }, 150);
+      });
+    }, true);
+
+    document.addEventListener('click', async (e) => {
+      const sendBtn = e.target?.closest?.(
+        'button[data-testid="compose-btn-send"], button[data-testid="send"], #main footer button[aria-label*="Send"], button:has(span[data-icon="send"])'
+      );
+      if (!sendBtn) return;
+      const composer = document.querySelector('#main footer [contenteditable="true"]');
+      if (!composer) return;
+
+      const text = (composer.innerText || composer.textContent || '').trim();
+      const parsed = parseApplicationText(text);
+      if (!parsed || !parsed.appId) return;
+
+      if (_bypassSendAppId === parsed.appId) {
+        _bypassSendAppId = null;
+        return;
+      }
+
+      const status = await checkApplicationStatus(parsed.appId);
+      if (status && status.exists) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      promptMandatoryTaskAdd(parsed, () => {
+        _bypassSendAppId = parsed.appId;
+        setTimeout(() => sendBtn.click(), 150);
+      });
+    }, true);
+  }
+
   // ── Boot ───────────────────────────────────────────────────────────────────
   async function boot(forceRefresh = false) {
     const panel = ensurePanel();
     panel.classList.remove('ds-hidden');
+    initComposerInterceptor();
     await refreshToolsOverview(panel, forceRefresh);
     refreshBadgesCache();
     setInterval(refreshBadgesCache, 60000);
@@ -2656,6 +2892,7 @@
 
     const check = async () => {
       applyChatBadges();
+      updateChatFloatingReminder();
       const id2 = await getIdentity();
       const k2 = id2 ? id2.key : '__none__';
       const chatMeta2 = getSelectedChatMeta();
