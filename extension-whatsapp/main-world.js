@@ -23,6 +23,9 @@
         var targets = [
             document.querySelector('#main header'),
             document.querySelector('[data-testid="conversation-header"]'),
+            document.querySelector('[data-testid="contact-info-drawer"]'),
+            document.querySelector('[data-testid="drawer-right"]'),
+            document.querySelector('div[role="region"]'),
             document.querySelector('#pane-side [aria-selected="true"]'),
             document.querySelector('#main')
         ];
@@ -56,8 +59,12 @@
                         var rawJid = target.id._serialized || (typeof target.id === 'string' ? target.id : '');
                         if (rawJid && (rawJid.indexOf('@c.us') !== -1 || rawJid.indexOf('@g.us') !== -1 || rawJid.indexOf('@s.whatsapp.net') !== -1)) {
                             var userPhone = target.id.user ? String(target.id.user) : (rawJid.split('@')[0] || '');
-                            var pushname = (contact && contact.pushname) ? contact.pushname : (target.pushname || '');
-                            var name = (contact && contact.name) ? contact.name : (target.name || '');
+                            var pushname = (contact && (contact.pushname || contact.notifyName || contact.verifiedName || contact.__x_pushname || contact.__x_notifyName)) ?
+                                (contact.pushname || contact.notifyName || contact.verifiedName || contact.__x_pushname || contact.__x_notifyName) :
+                                (target.pushname || target.notifyName || target.verifiedName || target.__x_pushname || target.__x_notifyName || '');
+                            var name = (contact && (contact.name || contact.displayName || contact.formattedTitle || contact.__x_name)) ?
+                                (contact.name || contact.displayName || contact.formattedTitle || contact.__x_name) :
+                                (target.name || target.displayName || target.formattedTitle || target.__x_name || '');
                             var formattedTitle = target.formattedTitle || (chat && chat.formattedTitle) || '';
                             var isBusiness = !!((contact && (contact.isBusiness || contact.isEnterprise)) || target.isBusiness || target.isEnterprise);
                             var avatarUrl = '';
@@ -102,8 +109,8 @@
                     return {
                         jid: jid,
                         phone: chat.id.user ? String(chat.id.user) : (jid.split('@')[0] || ''),
-                        name: (contact && contact.name) || chat.name || '',
-                        pushname: (contact && contact.pushname) || '',
+                        name: (contact && (contact.name || contact.displayName || contact.formattedTitle || contact.__x_name)) || chat.name || chat.formattedTitle || '',
+                        pushname: (contact && (contact.pushname || contact.notifyName || contact.verifiedName || contact.__x_pushname || contact.__x_notifyName)) || chat.pushname || chat.notifyName || '',
                         formattedTitle: chat.formattedTitle || '',
                         isBusiness: !!(contact && (contact.isBusiness || contact.isEnterprise)),
                         avatarUrl: (pObj && (pObj.eurl || pObj.img)) || '',
@@ -158,8 +165,8 @@
                                     return {
                                         jid: ajid,
                                         phone: active.id.user ? String(active.id.user) : (ajid.split('@')[0] || ''),
-                                        name: (c && c.name) || active.name || '',
-                                        pushname: (c && c.pushname) || '',
+                                        name: (c && (c.name || c.displayName || c.formattedTitle || c.__x_name)) || active.name || active.formattedTitle || '',
+                                        pushname: (c && (c.pushname || c.notifyName || c.verifiedName || c.__x_pushname || c.__x_notifyName)) || active.pushname || active.notifyName || '',
                                         formattedTitle: active.formattedTitle || '',
                                         isBusiness: !!(c && (c.isBusiness || c.isEnterprise)),
                                         avatarUrl: (pic && (pic.eurl || pic.img)) || '',
@@ -209,24 +216,68 @@
     // ── Method 3: DOM Fallback for Avatar, Pushname & Business ─────────────────
     function extractFromDom() {
         var h = document.querySelector('#main header') || document.querySelector('[data-testid="conversation-header"]');
-        if (!h) return null;
+        var drawer = document.querySelector('[data-testid="contact-info-drawer"]') ||
+                     document.querySelector('[data-testid="drawer-right"]') ||
+                     document.querySelector('div[role="region"]');
 
         var avatarUrl = '';
-        var img = h.querySelector('img[src*="blob:"], img[src*="pps.whatsapp.net"], img');
-        if (img && img.src && img.src.indexOf('data:image/svg') === -1) {
-            avatarUrl = img.src;
+        if (h) {
+            var img = h.querySelector('img[src*="blob:"], img[src*="pps.whatsapp.net"], img');
+            if (img && img.src && img.src.indexOf('data:image/svg') === -1) {
+                avatarUrl = img.src;
+            }
+        }
+        if (!avatarUrl && drawer) {
+            var dImg = drawer.querySelector('img[src*="blob:"], img[src*="pps.whatsapp.net"], img');
+            if (dImg && dImg.src && dImg.src.indexOf('data:image/svg') === -1) {
+                avatarUrl = dImg.src;
+            }
         }
 
         var pushname = '';
-        var subSpan = h.querySelector('[data-testid="conversation-info-header"] span:not([title])') ||
-                      h.querySelector('div[role="heading"] + span') ||
-                      h.querySelector('header span[dir="auto"]');
-        if (subSpan) {
-            var m = (subSpan.textContent || '').trim().match(/^~([^\n\r]+)$/);
-            if (m) pushname = m[1].trim();
+        // 1. Right contact info drawer (e.g. "~samir khan")
+        if (drawer) {
+            var dSpans = drawer.querySelectorAll('span, div, h2, h3');
+            for (var i = 0; i < dSpans.length; i++) {
+                var dTxt = (dSpans[i].textContent || '').trim();
+                var dm = dTxt.match(/^~\s*([^\n\r]+)$/);
+                if (dm && dm[1].trim()) {
+                    pushname = dm[1].trim();
+                    break;
+                }
+            }
         }
 
-        var isBusiness = !!h.querySelector('[data-icon="business-verified"], [data-icon="business"], [data-testid="business-chat"]');
+        // 2. Chat header
+        if (!pushname && h) {
+            var hSpans = h.querySelectorAll('span, div');
+            for (var j = 0; j < hSpans.length; j++) {
+                var hTxt = (hSpans[j].textContent || '').trim();
+                var hm = hTxt.match(/^~\s*([^\n\r]+)$/);
+                if (hm && hm[1].trim()) {
+                    pushname = hm[1].trim();
+                    break;
+                }
+            }
+        }
+
+        // 3. Selected chat in sidebar
+        if (!pushname) {
+            var selChat = document.querySelector('#pane-side [aria-selected="true"]');
+            if (selChat) {
+                var cSpans = selChat.querySelectorAll('span, div');
+                for (var k = 0; k < cSpans.length; k++) {
+                    var cTxt = (cSpans[k].textContent || '').trim();
+                    var cm = cTxt.match(/^~\s*([^\n\r]+)$/);
+                    if (cm && cm[1].trim()) {
+                        pushname = cm[1].trim();
+                        break;
+                    }
+                }
+            }
+        }
+
+        var isBusiness = !!(h && h.querySelector('[data-icon="business-verified"], [data-icon="business"], [data-testid="business-chat"]'));
 
         return {
             avatarUrl: avatarUrl,
@@ -252,11 +303,14 @@
         var base = fiberData || storeData || {};
         var dom = domData || {};
 
+        var rawPush = (base.pushname || dom.pushname || '').trim();
+        var pushname = rawPush.replace(/^~+\s*/, '').trim();
+
         return {
             jid: base.jid || '',
             phone: base.phone || '',
             name: base.name || '',
-            pushname: base.pushname || dom.pushname || '',
+            pushname: pushname,
             formattedTitle: base.formattedTitle || '',
             isBusiness: !!(base.isBusiness || dom.isBusiness),
             avatarUrl: base.avatarUrl || dom.avatarUrl || '',

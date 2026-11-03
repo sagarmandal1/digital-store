@@ -158,22 +158,27 @@
   // main-world.js listens for '__ds_req_jid' and fires '__ds_res_jid' back.
   // ──────────────────────────────────────────────────────────────────────────
 
-  function readActiveJidFromStore() {
+  function readActiveContactFromStore() {
     return new Promise(function (resolve) {
       var reqId = Math.random().toString(36).slice(2);
-      var timeout = setTimeout(function () { resolve(''); }, 600);
+      var timeout = setTimeout(function () { resolve(null); }, 600);
 
       window.addEventListener('__ds_res_jid', function handler(e) {
         if (!e.detail || e.detail.reqId !== reqId) return;
         window.removeEventListener('__ds_res_jid', handler);
         clearTimeout(timeout);
-        resolve(e.detail.jid || '');
+        resolve(e.detail || null);
       });
 
       window.dispatchEvent(new CustomEvent('__ds_req_jid', {
         detail: { reqId: reqId }
       }));
     });
+  }
+
+  async function readActiveJidFromStore() {
+    const info = await readActiveContactFromStore();
+    return info?.jid || '';
   }
 
   // JID → phone.  Only @c.us (individual). Groups @g.us → ignored.
@@ -189,6 +194,16 @@
     if (!/^\+?[\d][\d\s\-().]{4,18}$/.test(t)) return false;
     return !!normalizePhone(t);
   };
+
+  // WhatsApp pushnames usually start with ~ (e.g. "~samir khan")
+  function cleanPushname(raw) {
+    if (!raw || typeof raw !== 'string') return '';
+    let t = raw.trim().replace(/^~+\s*/, '').trim();
+    if (!t || t.length < 2) return '';
+    if (looksLikePhone(t)) return '';
+    if (!/[A-Za-z0-9\u0980-\u09FF]/.test(t)) return '';
+    return t;
+  }
 
   // ── DOM fallback (when webpack injection returns nothing) ──────────────────
   const getHeader = () =>
@@ -259,10 +274,60 @@
     // 4. Contact info drawer — walk every text node (most aggressive)
     const drawer =
       document.querySelector('[data-testid="contact-info-drawer"]') ||
-      document.querySelector('[data-testid="drawer-right"]');
+      document.querySelector('[data-testid="drawer-right"]') ||
+      document.querySelector('div[role="region"]');
     if (drawer) {
       const p = attrPhone(drawer, 60) || textWalkPhone(drawer);
       if (p) return p;
+    }
+
+    return '';
+  }
+
+  function getDomPushname() {
+    // 1. Right contact info drawer (e.g. "~samir khan")
+    const drawer =
+      document.querySelector('[data-testid="contact-info-drawer"]') ||
+      document.querySelector('[data-testid="drawer-right"]') ||
+      document.querySelector('div[role="region"]');
+    if (drawer) {
+      const nodes = drawer.querySelectorAll('span, div, h2, h3');
+      for (const el of nodes) {
+        const t = (el.textContent || '').trim();
+        const m = t.match(/^~\s*([^\n\r]+)$/);
+        if (m) {
+          const c = cleanPushname(m[1]);
+          if (c) return c;
+        }
+      }
+    }
+
+    // 2. Chat header (#main header)
+    const header = getHeader();
+    if (header) {
+      const nodes = header.querySelectorAll('span, div');
+      for (const el of nodes) {
+        const t = (el.textContent || '').trim();
+        const m = t.match(/^~\s*([^\n\r]+)$/);
+        if (m) {
+          const c = cleanPushname(m[1]);
+          if (c) return c;
+        }
+      }
+    }
+
+    // 3. Left chat list selected item
+    const selected = getSelectedChatRow();
+    if (selected) {
+      const nodes = selected.querySelectorAll('span, div');
+      for (const el of nodes) {
+        const t = (el.textContent || '').trim();
+        const m = t.match(/^~\s*([^\n\r]+)$/);
+        if (m) {
+          const c = cleanPushname(m[1]);
+          if (c) return c;
+        }
+      }
     }
 
     return '';
@@ -325,21 +390,50 @@
     if (!getHeader()) return null;
     if (isSelfChat()) return null;
 
-    // Try webpack store first
-    const storeJid = await readActiveJidFromStore();
-    let phone = jidPhone(storeJid);
+    // Try webpack / fiber store first
+    const storeContact = await readActiveContactFromStore();
+    const storeJid = storeContact?.jid || '';
+    let phone = jidPhone(storeJid) || (storeContact?.phone ? normalizePhone(storeContact.phone) : '');
 
     // Fallback to DOM
     if (!phone) phone = domFallbackPhone();
 
     // Name from header (only for saved contacts whose header shows a name)
     const title = getHeaderTitle();
-    const name = (!looksLikePhone(title) && !/\(you\)/i.test(title)) ? title.trim() : '';
+    let name = (!looksLikePhone(title) && !/\(you\)/i.test(title)) ? title.trim() : '';
+
+    // Pushname from store or DOM
+    let pushname = cleanPushname(storeContact?.pushname || storeContact?.name || '');
+    if (!pushname) {
+      pushname = getDomPushname();
+    }
+
+    // If contact is unsaved (header is a phone number), fallback to pushname
+    if (!name && pushname) {
+      name = pushname;
+    }
+
+    // Secondary fallback: if still empty, check if an application is detected in chat
+    if (!name) {
+      try {
+        const appInfo = detectChatApplication();
+        if (appInfo && appInfo.name) {
+          name = appInfo.name.trim();
+        }
+      } catch (e) { /* ignore */ }
+    }
 
     if (!phone && !name) return null;
 
     const key = phone ? `phone:${phone}` : `name:${nk(name)}`;
-    return { phone, name, key, titleKey: name };
+    return {
+      phone,
+      name,
+      pushname,
+      key,
+      titleKey: name,
+      avatarUrl: storeContact?.avatarUrl || ''
+    };
   }
 
   // ── API ────────────────────────────────────────────────────────────────────
@@ -703,8 +797,10 @@
       const res = await apiGet('ajax_customer_lookup', { name });
       if (res.ok && res.found) {
         const dp = normalizePhone(res.customer.phone || '');
-        const ledger = await apiGet('ajax_customer_ledger_events', { customer_id: res.customer.id });
-        render(panel, { ...id, phone: dp || ph, nameMatch: true }, res, ledger); return;
+        if (!ph || !dp || dp === ph) {
+          const ledger = await apiGet('ajax_customer_ledger_events', { customer_id: res.customer.id });
+          render(panel, { ...id, phone: dp || ph, nameMatch: true }, res, ledger); return;
+        }
       }
     }
     // 3. Stored binding
@@ -742,7 +838,14 @@
     if (!lookup.found) {
       _currentCustomer = null;
       applyChatBadges();
-      const ip = esc(id?.phone || ''), iname = esc(id?.name || '');
+      const ip = esc(id?.phone || '');
+      let iname = esc(cleanPushname(id?.name || id?.pushname || '') || getDomPushname() || '');
+      if (!iname) {
+        try {
+          const appInfo = detectChatApplication();
+          if (appInfo && appInfo.name) iname = esc(appInfo.name);
+        } catch (e) {}
+      }
       cEl.innerHTML = `
         <div class="ds-empty">
           <div class="ds-empty-icon">👤</div>
@@ -751,11 +854,12 @@
         </div>`;
       aEl.innerHTML = `<button class="ds-btn ds-btn-primary ds-btn-block" id="ds-add">+ কাস্টমার যোগ করুন</button>`;
       aEl.querySelector('#ds-add').onclick = () => {
+        const freshName = cleanPushname(iname || id?.name || id?.pushname || '') || getDomPushname() || '';
         modal('নতুন কাস্টমার', `
           <div class="ds-field"><label class="ds-label">ফোন</label>
             <input class="ds-input" id="nph" value="${ip}" placeholder="+880..."></div>
           <div class="ds-field"><label class="ds-label">নাম</label>
-            <input class="ds-input" id="nnm" value="${iname}" placeholder="কাস্টমারের নাম"></div>
+            <input class="ds-input" id="nnm" value="${esc(freshName)}" placeholder="কাস্টমারের নাম"></div>
           <div class="ds-field"><label class="ds-label">ইমেইল</label>
             <input class="ds-input" id="nem" placeholder="ঐচ্ছিক"></div>
           <div class="ds-field"><label class="ds-label">ঠিকানা</label>
@@ -2870,7 +2974,7 @@
     const id = await getIdentity();
     const key = id ? id.key : '__none__';
     const chatMeta = getSelectedChatMeta();
-    const chatSignal = `${key}|${chatMeta.unreadCount}|${chatMeta.muted ? 1 : 0}`;
+    const chatSignal = `${key}|${chatMeta.unreadCount}|${chatMeta.muted ? 1 : 0}|${id?.name || ''}`;
 
     if (id && (forceRefresh || _lastKey !== key || _lastChatSignal !== chatSignal)) {
       _lastKey = key;
@@ -2896,7 +3000,7 @@
       const id2 = await getIdentity();
       const k2 = id2 ? id2.key : '__none__';
       const chatMeta2 = getSelectedChatMeta();
-      const chatSignal2 = `${k2}|${chatMeta2.unreadCount}|${chatMeta2.muted ? 1 : 0}`;
+      const chatSignal2 = `${k2}|${chatMeta2.unreadCount}|${chatMeta2.muted ? 1 : 0}|${id2?.name || ''}`;
       if (_lastKey === k2 && _lastChatSignal === chatSignal2) return;
       _lastKey = k2;
       _lastChatSignal = chatSignal2;
@@ -2911,7 +3015,13 @@
     const debounced = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(check, 350); };
 
     observer = new MutationObserver(debounced);
-    const targets = [document.querySelector('#main'), document.querySelector('#pane-side')].filter(Boolean);
+    const targets = [
+      document.querySelector('#main'),
+      document.querySelector('#pane-side'),
+      document.querySelector('[data-testid="contact-info-drawer"]'),
+      document.querySelector('[data-testid="drawer-right"]'),
+      document.querySelector('#app')
+    ].filter(Boolean);
     if (targets.length) {
       targets.forEach(t => observer.observe(t, {
         subtree: true, childList: true, attributes: true,
