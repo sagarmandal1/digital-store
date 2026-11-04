@@ -1899,13 +1899,14 @@
         const tid = Number(btn.dataset.taskSendSeller || 0);
         const t = pendingTasks.find(x => x.id === tid);
         if (!t) return;
-        const sellers = await fetchSellers();
+        const sellers = await fetchSellers(true);
         let targetSeller = sellers.find(s => s.id === t.seller_id) || sellers.find(s => s.name === t.seller_name);
 
         if (!targetSeller) {
           if (!sellers.length) {
             openSellerAddModal(async (newSeller) => {
-              await sendApplicationToSeller(newSeller, t.task_name, t.notes, c);
+              await sendTaskViaApi(t.id, newSeller.id, newSeller.name);
+              await loadSafe(panel, id);
             });
             return;
           }
@@ -1919,7 +1920,7 @@
             </div>
             <div class="ds-modal-actions">
               <button class="ds-btn ds-btn-secondary ds-btn-block" type="button" id="ts-c">বাতিল</button>
-              <button class="ds-btn ds-btn-block" type="button" id="ts-s">পাঠান 🚀</button>
+              <button class="ds-btn ds-btn-primary ds-btn-block" type="button" id="ts-s">API দিয়ে পাঠান 🚀</button>
             </div>`,
             (ov, close) => {
               ov.querySelector('#ts-c').onclick = close;
@@ -1928,11 +1929,13 @@
                 const sObj = sellers.find(x => x.id === sid);
                 if (!sObj) { toast('সেলার সিলেক্ট করুন'); return; }
                 close();
-                await sendApplicationToSeller(sObj, t.task_name, t.notes, c);
+                await sendTaskViaApi(t.id, sObj.id, sObj.name);
+                await loadSafe(panel, id);
               };
             });
         } else {
-          await sendApplicationToSeller(targetSeller, t.task_name, t.notes, c);
+          await sendTaskViaApi(t.id, targetSeller.id, targetSeller.name);
+          await loadSafe(panel, id);
         }
       });
     });
@@ -2221,7 +2224,6 @@
 
   // ── Seller / Vendor Management ─────────────────────────────────────────────
   let _cachedSellers = [];
-  let _returnCustomerChat = null;
 
   async function fetchSellers(force = false) {
     if (_cachedSellers.length && !force) return _cachedSellers;
@@ -2281,117 +2283,21 @@
       });
   }
 
-  async function sendApplicationToSeller(seller, taskTitle, notes, customer) {
-    if (!seller) return false;
-    const cleanPhone = normalizePhone(seller.phone);
-    if (!cleanPhone && !seller.name) {
-      toast('সেলার নম্বর পাওয়া যায়নি');
+  async function sendTaskViaApi(taskId, sellerId, sellerName) {
+    toast(`সেলার ${sellerName}-কে WhatsApp API দিয়ে পাঠানো হচ্ছে...`);
+    try {
+      const res = await apiPost('ajax_sellers', { action: 'send_task', task_id: taskId, seller_id: sellerId });
+      if (res && res.ok) {
+        toast(`✓ সেলার ${esc(sellerName)}-কে WhatsApp API দিয়ে সফলভাবে কাজ পাঠানো হয়েছে`);
+        return true;
+      } else {
+        toast(esc(res?.error || 'WhatsApp API দিয়ে পাঠাতে ব্যর্থ হয়েছে'));
+        return false;
+      }
+    } catch (e) {
+      toast('অনুরোধ ব্যর্থ হয়েছে');
       return false;
     }
-
-    const fullMsg = `📦 *নতুন কাজের আবেদন*\n` +
-      `━━━━━━━━━━━━━━━━\n` +
-      `*কাজ:* ${taskTitle}\n\n` +
-      `${notes}\n` +
-      `━━━━━━━━━━━━━━━━\n` +
-      `👤 *কাস্টমার:* ${customer?.name || 'N/A'}${customer?.phone ? ` (${customer.phone})` : ''}\n` +
-      `📅 *তারিখ:* ${new Date().toLocaleDateString('en-GB')}`;
-
-    if (customer) {
-      _returnCustomerChat = {
-        phone: customer.phone,
-        name: customer.name
-      };
-    }
-
-    const searchTerm = cleanPhone || seller.name;
-    toast(`সেলার ${seller.name}-এর কাছে পাঠানো হচ্ছে...`);
-
-    let switched = false;
-    try {
-      const searchInput =
-        document.querySelector('#side [contenteditable="true"]') ||
-        document.querySelector('[data-testid="chat-list-search"] [contenteditable="true"]') ||
-        document.querySelector('div[contenteditable="true"][data-tab="3"]') ||
-        document.querySelector('div[role="textbox"][data-tab="3"]');
-
-      if (searchInput) {
-        searchInput.focus();
-        document.execCommand('selectAll', false, null);
-        document.execCommand('delete', false, null);
-        document.execCommand('insertText', false, searchTerm);
-        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-
-        await new Promise(r => setTimeout(r, 500));
-
-        const chatRow =
-          document.querySelector('#pane-side [role="row"], #pane-side [role="listitem"], [data-testid="cell-frame-container"]') ||
-          document.querySelector('[data-testid="chat-list"] [role="listitem"]');
-
-        if (chatRow) {
-          chatRow.click();
-          switched = true;
-          await new Promise(r => setTimeout(r, 650));
-          await pasteToChat(fullMsg, true);
-
-          setTimeout(() => {
-            const cancelBtn = document.querySelector('[data-testid="icon-search-morph"], [data-testid="x-alt"], button[aria-label*="Cancel"], button[aria-label*="Clear"]');
-            cancelBtn?.click();
-          }, 350);
-        }
-      }
-    } catch (e) {}
-
-    if (!switched) {
-      const url = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(fullMsg)}`;
-      window.open(url, '_blank');
-    }
-
-    toast(`✓ সেলার ${seller.name}-কে কাজ পাঠানো হয়েছে`);
-    showReturnToCustomerBanner(_returnCustomerChat);
-    return true;
-  }
-
-  function showReturnToCustomerBanner(cust) {
-    if (!cust || (!cust.phone && !cust.name)) return;
-    document.getElementById('ds-return-customer-banner')?.remove();
-    const banner = document.createElement('div');
-    banner.id = 'ds-return-customer-banner';
-    banner.className = 'ds-return-customer-banner';
-    banner.innerHTML = `
-      <span>সেলারকে পাঠানো সম্পন্ন</span>
-      <button class="ds-return-customer-btn" type="button" id="ds-btn-ret-cust">
-        ↩ ${esc(cust.name || 'কাস্টমার')} এর চ্যাটে ফিরুন
-      </button>
-      <button type="button" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:16px;line-height:1;" id="ds-btn-ret-close">×</button>
-    `;
-    document.body.appendChild(banner);
-
-    const remove = () => banner.remove();
-    banner.querySelector('#ds-btn-ret-close').onclick = remove;
-    banner.querySelector('#ds-btn-ret-cust').onclick = async () => {
-      remove();
-      const term = cust.phone || cust.name;
-      const searchInput =
-        document.querySelector('#side [contenteditable="true"]') ||
-        document.querySelector('[data-testid="chat-list-search"]') ||
-        document.querySelector('div[contenteditable="true"][data-tab="3"]');
-      if (searchInput && term) {
-        searchInput.focus();
-        document.execCommand('selectAll', false, null);
-        document.execCommand('delete', false, null);
-        document.execCommand('insertText', false, term);
-        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-        await new Promise(r => setTimeout(r, 450));
-        const row = document.querySelector('#pane-side [role="row"], #pane-side [role="listitem"]');
-        row?.click();
-        setTimeout(() => {
-          document.querySelector('[data-testid="x-alt"], button[aria-label*="Cancel"]')?.click();
-        }, 300);
-      }
-    };
-
-    setTimeout(() => banner.remove(), 25000);
   }
 
   function openTaskAddModal(panel, c, id, flowKey, canWrite, initialApp = null, onDone = null) {
@@ -2446,7 +2352,7 @@
         <div id="ta-seller-autosend-wrap" style="margin-top:8px;display:none;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:6px;padding:6px 10px;">
           <label class="ds-checkbox-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11.5px;font-weight:700;color:var(--text);margin:0;">
             <input type="checkbox" id="ta-autosend-seller" checked style="width:16px;height:16px;margin:0;accent-color:#10b981;">
-            <span>🚀 সেভ করার সাথে সাথে সেলারকে WhatsApp এ পাঠাও</span>
+            <span>⚡ সেভ করার সাথে সাথে সেলারকে WhatsApp API দিয়ে অটো পাঠাও</span>
           </label>
         </div>
       </div>
@@ -2667,6 +2573,7 @@
               notes: finalNotes,
               seller_id: selSeller ? selSeller.id : null,
               seller_name: selSeller ? selSeller.name : '',
+              auto_send_seller: shouldAutoSend ? 1 : 0,
             });
             if (res.ok) {
               if (selectedSellerId) {
@@ -2700,12 +2607,14 @@
               document.getElementById('ds-app-floating-pill')?.remove();
               if (typeof onDone === 'function') onDone(res);
               close();
-              toast(res.updated ? 'কাজ আপডেট হয়েছে' : 'কাজ যোগ হয়েছে');
-              await loadSafe(panel, id);
-
-              if (shouldAutoSend && selSeller) {
-                sendApplicationToSeller(selSeller, name, finalNotes, c);
+              if (res.seller_sent && selSeller) {
+                toast(`✓ ${res.updated ? 'কাজ আপডেট' : 'কাজ যোগ'} হয়েছে ও সেলার ${esc(selSeller.name)}-কে WhatsApp API দিয়ে পাঠানো হয়েছে!`);
+              } else if (res.seller_error) {
+                toast(`কাজ সেভ হয়েছে, কিন্তু সেলারকে API মেসেজ যায়নি: ${esc(res.seller_error)}`);
+              } else {
+                toast(res.updated ? 'কাজ আপডেট হয়েছে' : 'কাজ যোগ হয়েছে');
               }
+              await loadSafe(panel, id);
             } else {
               toast(esc(res.error || 'ব্যর্থ'));
               if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'সেভ'; }

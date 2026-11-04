@@ -78,6 +78,21 @@ try {
             exit;
         }
 
+        if ($subAction === 'send_task') {
+            $taskId = (int)($data['task_id'] ?? 0);
+            $sellerId = (int)($data['seller_id'] ?? 0);
+            if ($taskId <= 0) {
+                app_ext_api_send_json(400, ['ok' => false, 'error' => 'task_id required']);
+            }
+            $res = whatsapp_send_task_to_seller($taskId, $sellerId, $aid);
+            if (!empty($res['ok'])) {
+                echo json_encode($res);
+            } else {
+                app_ext_api_send_json(400, $res);
+            }
+            exit;
+        }
+
         if ($subAction === 'delete') {
             $id = (int)($data['id'] ?? 0);
             if ($id <= 0) {

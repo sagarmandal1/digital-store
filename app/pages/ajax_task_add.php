@@ -170,15 +170,32 @@ try {
         }
     }
 
+    $sellerSent = false;
+    $sellerSendError = null;
+    $shouldAutoSendSeller = !empty($data['auto_send_seller']) || !empty($data['auto_send']);
+    if ($shouldAutoSendSeller && $sellerId > 0) {
+        $sendRes = whatsapp_send_task_to_seller($taskId, $sellerId, $ownerId);
+        if (!empty($sendRes['ok'])) {
+            $sellerSent = true;
+        } else {
+            $sellerSendError = $sendRes['error'] ?? 'WhatsApp API message failed';
+        }
+    }
+
     app_audit_log($actionType, 'task', $taskId, [
         'customer_id' => $customerId,
         'task_name' => $taskName,
         'amount' => $amount,
+        'seller_id' => $sellerId > 0 ? $sellerId : null,
+        'seller_sent' => $sellerSent,
     ]);
     echo json_encode([
         'ok' => true,
         'task_id' => $taskId,
         'updated' => ($actionType === 'update'),
+        'seller_sent' => $sellerSent,
+        'seller_name' => $sellerName,
+        'seller_error' => $sellerSendError,
     ]);
 } catch (Throwable $e) {
     app_ext_api_send_json(500, ['ok' => false, 'error' => 'Task creation failed']);
