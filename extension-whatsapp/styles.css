@@ -139,12 +139,67 @@
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   transition: box-shadow .25s ease, opacity .25s ease, transform .25s cubic-bezier(.34, 1.56, .64, 1);
-  user-select: none;
+  user-select: text;
+  -webkit-user-select: text;
   box-sizing: border-box;
 }
 
 #ds-wa-panel * {
   box-sizing: border-box;
+}
+
+#ds-wa-panel ::selection {
+  background: rgba(16, 185, 129, 0.4) !important;
+  color: #ffffff !important;
+}
+
+/* Ensure interactive controls are not dragged as text, while content is freely selectable */
+#ds-wa-panel .ds-header,
+#ds-wa-panel .ds-nav,
+#ds-wa-panel .ds-btn,
+#ds-wa-panel .ds-tab-btn,
+#ds-wa-panel .ds-chip-btn,
+#ds-wa-panel .ds-sub-tab-btn,
+#ds-wa-panel .ds-resize-handle,
+#ds-wa-panel .ds-modal-close,
+#ds-wa-launcher {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+#ds-wa-panel .ds-body,
+#ds-wa-panel .ds-card,
+#ds-wa-panel .ds-list,
+#ds-wa-panel .ds-list-item,
+#ds-wa-panel .ds-list-label,
+#ds-wa-panel .ds-list-sub,
+#ds-wa-panel .ds-modal,
+#ds-wa-panel .ds-modal-body,
+#ds-wa-panel .ds-due-card,
+#ds-wa-panel .ds-due-notes,
+#ds-wa-panel .ds-task-notes-preview,
+#ds-wa-panel .ds-workflow-banner,
+#ds-wa-panel .ds-flow-state,
+#ds-wa-panel .ds-flow-row,
+#ds-wa-panel .ds-soft-banner,
+#ds-wa-panel .ds-warn-banner,
+#ds-wa-panel .ds-field,
+#ds-wa-panel .ds-info-chip,
+#ds-wa-panel input,
+#ds-wa-panel textarea,
+#ds-wa-panel select,
+#ds-wa-panel pre,
+#ds-wa-panel code,
+#ds-wa-panel p,
+#ds-wa-panel span,
+#ds-wa-panel div {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+#ds-wa-panel input,
+#ds-wa-panel textarea {
+  cursor: text !important;
 }
 
 #ds-wa-panel.ds-hidden {
@@ -1038,6 +1093,27 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.ds-task-notes-preview {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  padding: 6px 9px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 90px;
+  overflow-y: auto;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text;
+}
+
+.ds-task-notes-preview:hover {
+  border-color: var(--border2);
 }
 
 /* ── Due Sales Section ───────────────────────────────────────────────────── */

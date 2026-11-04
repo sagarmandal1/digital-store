@@ -736,6 +736,35 @@
     setTimeout(() => el.remove(), 2400);
   }
 
+  function copyToClipboard(text, successMsg = '✓ ক্লিপবোর্ডে কপি হয়েছে') {
+    if (!text) { toast('কপি করার মতো কোনো তথ্য নেই'); return; }
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        ta.remove();
+        if (ok) toast(successMsg);
+        else toast('কপি করতে ব্যর্থ হয়েছে');
+      } catch (e) {
+        toast('কপি করতে ব্যর্থ হয়েছে');
+      }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast(successMsg);
+      }).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
   function modal(title, body, onBind) {
     // Render inside the panel itself — not a full-page overlay
     const panel = document.getElementById('ds-wa-panel');
@@ -1649,9 +1678,12 @@
       ${notes.length ? `
         <div class="ds-subtitle">নোটসমূহ</div>
         <div class="ds-list">
-          ${notes.map(n => `<div class="ds-list-item" style="flex-direction:column;align-items:flex-start;">
-            <div class="ds-list-sub" style="margin-bottom:3px;">${esc(n.created_at || '')}</div>
-            <div class="ds-list-label" style="font-weight:400;">${esc(n.note || '')}</div>
+          ${notes.map(n => `<div class="ds-list-item ds-note-item" style="flex-direction:column;align-items:flex-start;user-select:text !important;">
+            <div class="ds-list-sub" style="margin-bottom:3px;display:flex;justify-content:space-between;width:100%;align-items:center;">
+              <span>${esc(n.created_at || '')}</span>
+              <button class="ds-chip-btn" type="button" data-note-copy="${esc(n.note || '')}" style="font-size:10px;padding:1px 6px;">📋 কপি</button>
+            </div>
+            <div class="ds-list-label" style="font-weight:400;white-space:pre-wrap;word-break:break-word;user-select:text !important;cursor:text;">${esc(n.note || '')}</div>
           </div>`).join('')}
         </div>`: ''}`;
 
@@ -1685,26 +1717,37 @@
         if (!t) return;
         modal('✅ ডেলিভারি সম্পন্ন কাজের বিবরণ', `
           <div class="ds-field"><label class="ds-label">কাজের নাম</label>
-            <div style="font-weight:800;font-size:14px;padding:6px 0;">${esc(t.task_name)}</div></div>
+            <div style="font-weight:800;font-size:14px;padding:6px 0;user-select:text;">${esc(t.task_name)}</div></div>
           <div class="ds-row">
             <div class="ds-field"><label class="ds-label">মূল্য / রেট</label>
-              <div style="font-weight:700;color:var(--ds-accent);padding:6px 0;">${fmt(t.amount)}</div></div>
+              <div style="font-weight:700;color:var(--ds-accent);padding:6px 0;user-select:text;">${fmt(t.amount)}</div></div>
             <div class="ds-field"><label class="ds-label">ইনভয়েস নম্বর</label>
-              <div style="font-weight:700;padding:6px 0;">${t.invoice_no ? `<span class="ds-invoice-tag">${esc(t.invoice_no)}</span>` : 'N/A'}</div></div>
+              <div style="font-weight:700;padding:6px 0;user-select:text;">${t.invoice_no ? `<span class="ds-invoice-tag">${esc(t.invoice_no)}</span>` : 'N/A'}</div></div>
           </div>
           <div class="ds-row">
             <div class="ds-field"><label class="ds-label">ডেলিভারি তারিখ</label>
-              <div class="ds-muted" style="padding:6px 0;">${esc(t.delivered_at || t.created_at || '')}</div></div>
+              <div class="ds-muted" style="padding:6px 0;user-select:text;">${esc(t.delivered_at || t.created_at || '')}</div></div>
             <div class="ds-field"><label class="ds-label">পেমেন্ট অবস্থা</label>
-              <div style="padding:6px 0;">${t.is_paid ? '<b class="ds-green">✓ সম্পূর্ণ পরিশোধিত</b>' : `<b class="ds-red">⚠️ বাকি: ${fmt(t.due_amount)}</b>`}</div></div>
+              <div style="padding:6px 0;user-select:text;">${t.is_paid ? '<b class="ds-green">✓ সম্পূর্ণ পরিশোধিত</b>' : `<b class="ds-red">⚠️ বাকি: ${fmt(t.due_amount)}</b>`}</div></div>
           </div>
-          ${t.notes ? `<div class="ds-field"><label class="ds-label">আবেদনের তথ্য / নোট</label>
-            <div style="background:var(--ds-bg2);padding:10px 12px;border-radius:10px;border:1px solid var(--ds-border);
-              font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;">${esc(t.notes)}</div></div>` : ''}
-          <div class="ds-modal-actions">
-            <button class="ds-btn ds-btn-secondary ds-btn-block" type="button" id="tdv-close">বন্ধ করুন</button>
+          ${t.seller_name ? `<div class="ds-field"><label class="ds-label">সেলার</label>
+            <div style="padding:6px 0;user-select:text;"><span class="ds-seller-tag">👤 ${esc(t.seller_name)}</span></div></div>` : ''}
+          ${t.notes ? `<div class="ds-field">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label class="ds-label" style="margin:0;">আবেদনের তথ্য / নোট</label>
+              <button class="ds-chip-btn" type="button" id="tdv-copy-chip" style="font-weight:700;color:var(--ds-accent);">📋 কপি</button>
+            </div>
+            <div style="background:var(--ds-bg2,#1e293b);padding:10px 12px;border-radius:10px;border:1px solid var(--ds-border,#334155);
+              font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;user-select:text !important;-webkit-user-select:text !important;cursor:text;">${esc(t.notes)}</div></div>` : ''}
+          <div class="ds-modal-actions" style="${t.notes ? 'grid-template-columns: 1fr 1fr;' : 'grid-template-columns: 1fr;'}">
+            ${t.notes ? `<button class="ds-btn ds-btn-primary" type="button" id="tdv-copy-all">📋 নোট কপি</button>` : ''}
+            <button class="ds-btn ds-btn-secondary" type="button" id="tdv-close">বন্ধ করুন</button>
           </div>`,
-          (ov, close) => { ov.querySelector('#tdv-close').onclick = close; });
+          (ov, close) => {
+            ov.querySelector('#tdv-close').onclick = close;
+            ov.querySelector('#tdv-copy-chip')?.addEventListener('click', () => copyToClipboard(t.notes, '✓ আবেদনের নোট কপি হয়েছে'));
+            ov.querySelector('#tdv-copy-all')?.addEventListener('click', () => copyToClipboard(t.notes, '✓ আবেদনের নোট কপি হয়েছে'));
+          });
       });
     });
 
@@ -1716,18 +1759,49 @@
         if (!t) return;
         modal('📋 কাজের বিবরণ', `
           <div class="ds-field"><label class="ds-label">কাজের নাম</label>
-            <div style="font-weight:800;font-size:14px;padding:6px 0;">${esc(t.task_name)}</div></div>
+            <div style="font-weight:800;font-size:14px;padding:6px 0;user-select:text;">${esc(t.task_name)}</div></div>
           <div class="ds-field"><label class="ds-label">মূল্য</label>
-            <div style="font-weight:700;color:var(--ds-accent);padding:6px 0;">${fmt(t.amount)}</div></div>
+            <div style="font-weight:700;color:var(--ds-accent);padding:6px 0;user-select:text;">${fmt(t.amount)}</div></div>
           <div class="ds-field"><label class="ds-label">তারিখ</label>
-            <div class="ds-muted" style="padding:6px 0;">${esc(t.created_at || '')}</div></div>
-          ${t.notes ? `<div class="ds-field"><label class="ds-label">বিস্তারিত নোট</label>
-            <div style="background:var(--ds-bg2);padding:10px 12px;border-radius:10px;border:1px solid var(--ds-border);
-              font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;">${esc(t.notes)}</div></div>` : ''}
-          <div class="ds-modal-actions">
-            <button class="ds-btn ds-btn-secondary ds-btn-block" type="button" id="tv-close">বন্ধ করুন</button>
+            <div class="ds-muted" style="padding:6px 0;user-select:text;">${esc(t.created_at || '')}</div></div>
+          ${t.seller_name ? `<div class="ds-field"><label class="ds-label">সেলার</label>
+            <div style="padding:6px 0;user-select:text;"><span class="ds-seller-tag">👤 ${esc(t.seller_name)}</span></div></div>` : ''}
+          ${t.notes ? `<div class="ds-field">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label class="ds-label" style="margin:0;">বিস্তারিত নোট / আবেদনের তথ্য</label>
+              <button class="ds-chip-btn" type="button" id="tv-copy-chip" style="font-weight:700;color:var(--ds-accent);">📋 কপি</button>
+            </div>
+            <div style="background:var(--ds-bg2,#1e293b);padding:10px 12px;border-radius:10px;border:1px solid var(--ds-border,#334155);
+              font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;user-select:text !important;-webkit-user-select:text !important;cursor:text;">${esc(t.notes)}</div></div>` : ''}
+          <div class="ds-modal-actions" style="${t.notes ? 'grid-template-columns: 1fr 1fr;' : 'grid-template-columns: 1fr;'}">
+            ${t.notes ? `<button class="ds-btn ds-btn-primary" type="button" id="tv-copy-all">📋 পুরো নোট কপি</button>` : ''}
+            <button class="ds-btn ds-btn-secondary" type="button" id="tv-close">বন্ধ করুন</button>
           </div>`,
-          (ov, close) => { ov.querySelector('#tv-close').onclick = close; });
+          (ov, close) => {
+            ov.querySelector('#tv-close').onclick = close;
+            ov.querySelector('#tv-copy-chip')?.addEventListener('click', () => copyToClipboard(t.notes, '✓ আবেদনের নোট কপি হয়েছে'));
+            ov.querySelector('#tv-copy-all')?.addEventListener('click', () => copyToClipboard(t.notes, '✓ আবেদনের নোট কপি হয়েছে'));
+          });
+      });
+    });
+
+    // ── Task & Note quick copy listeners ──────────────────────────────────────
+    rEl.querySelectorAll('[data-task-copy]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tid = Number(btn.dataset.taskCopy || 0);
+        const t = (pendingTasks || []).find(x => x.id === tid) || (deliveredTasks || []).find(x => x.id === tid);
+        if (t && t.notes) {
+          copyToClipboard(t.notes, '✓ আবেদনের তথ্য কপি হয়েছে');
+        } else {
+          toast('কপি করার মতো কোনো নোট নেই');
+        }
+      });
+    });
+
+    rEl.querySelectorAll('[data-note-copy]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = btn.dataset.noteCopy || '';
+        copyToClipboard(text, '✓ নোট কপি হয়েছে');
       });
     });
 
@@ -2109,17 +2183,21 @@
             <div class="ds-list-item" style="flex-direction:column;align-items:stretch;gap:6px;padding:10px 0;">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div>
-                  <div style="font-weight:800;font-size:12px;">${esc(t.task_name)}</div>
+                  <div style="font-weight:800;font-size:12px;user-select:text;">${esc(t.task_name)}</div>
                   <div class="ds-list-sub" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px;">
                     <span>${esc(t.created_at || '')}</span>
-                    ${t.notes ? '<span>• নোট আছে</span>' : ''}
                     ${t.seller_name ? `<span class="ds-seller-tag">👤 সেলার: ${esc(t.seller_name)}</span>` : ''}
                   </div>
                 </div>
                 <div style="font-weight:700;color:var(--ds-accent);font-size:12px;white-space:nowrap;">${fmt(t.amount)}</div>
               </div>
+              ${t.notes ? `
+                <div class="ds-task-notes-preview" style="background:var(--ds-bg2,#1e293b);padding:7px 9px;border-radius:6px;font-size:11.5px;line-height:1.45;color:var(--ds-text,#e2e8f0);white-space:pre-wrap;word-break:break-word;max-height:85px;overflow-y:auto;border:1px solid var(--ds-border,#334155);user-select:text !important;-webkit-user-select:text !important;cursor:text;">
+                  ${esc(t.notes)}
+                </div>` : ''}
               <div style="display:flex;gap:5px;flex-wrap:wrap;">
                 <button class="ds-chip-btn" data-task-view="${t.id}" type="button">বিস্তারিত</button>
+                ${t.notes ? `<button class="ds-chip-btn" data-task-copy="${t.id}" type="button" title="আবেদনের তথ্য কপি করুন" style="color:var(--ds-accent);font-weight:700;">📋 কপি</button>` : ''}
                 <button class="ds-chip-btn" data-task-edit="${t.id}" type="button" style="color:var(--ds-text2);">এডিট</button>
                 <button class="ds-chip-btn" data-task-deliver="${t.id}" type="button"
                   style="background:var(--ds-accent);color:#fff;">ডেলিভারি ✓</button>
@@ -2193,10 +2271,11 @@
               <div class="ds-list-item ds-task-item-delivered" style="flex-direction:column;align-items:stretch;gap:5px;padding:8px 0;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
                   <div style="flex:1;min-width:0;">
-                    <div style="font-weight:700;font-size:12px;color:var(--text);word-break:break-word;">${esc(t.task_name)}</div>
+                    <div style="font-weight:700;font-size:12px;color:var(--text);word-break:break-word;user-select:text;">${esc(t.task_name)}</div>
                     <div class="ds-list-sub" style="margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                       ${t.delivered_at ? `<span>ডেলিভারি: ${esc(t.delivered_at.slice(0, 16))}</span>` : ''}
                       ${t.invoice_no ? `<span class="ds-invoice-tag">${esc(t.invoice_no)}</span>` : ''}
+                      ${t.seller_name ? `<span class="ds-seller-tag">👤 সেলার: ${esc(t.seller_name)}</span>` : ''}
                     </div>
                   </div>
                   <div style="text-align:right;flex-shrink:0;">
@@ -2208,8 +2287,13 @@
                     </div>
                   </div>
                 </div>
+                ${t.notes ? `
+                  <div class="ds-task-notes-preview" style="background:var(--ds-bg2,#1e293b);padding:7px 9px;border-radius:6px;font-size:11.5px;line-height:1.45;color:var(--ds-text,#e2e8f0);white-space:pre-wrap;word-break:break-word;max-height:85px;overflow-y:auto;border:1px solid var(--ds-border,#334155);user-select:text !important;-webkit-user-select:text !important;cursor:text;">
+                    ${esc(t.notes)}
+                  </div>` : ''}
                 <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;">
                   <button class="ds-chip-btn" data-task-view-delivered="${t.id}" type="button">বিস্তারিত</button>
+                  ${t.notes ? `<button class="ds-chip-btn" data-task-copy="${t.id}" type="button" title="আবেদনের তথ্য কপি করুন" style="color:var(--ds-accent);font-weight:700;">📋 কপি</button>` : ''}
                   ${!isPaid && t.sale_id ? `
                     <button class="ds-chip-btn ds-chip-pay" type="button" data-pay-sale="${t.sale_id}" data-due="${dueAmt}" data-inv="${esc(t.invoice_no)}">
                       💵 বাকি আদায়
